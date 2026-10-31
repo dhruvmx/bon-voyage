@@ -206,7 +206,8 @@ export default function VoyageMap({
       // Alternative routes
       if (layers.alternatives)
         routes
-          ?.filter((r) => r.id !== route.id)
+          ?.filter((r, index, all) => (r.path_id || r.id) !== (route.path_id || route.id)
+            && all.findIndex((other) => (other.path_id || other.id) === (r.path_id || r.id)) === index)
           .forEach((r) =>
             L.polyline(shiftCoords(r.coordinates, offset), {
               color: "var(--muted)",
@@ -280,6 +281,7 @@ export default function VoyageMap({
     const key = JSON.stringify([
       route.coordinates[0],
       route.coordinates.at(-1),
+      route.path_id,
     ]);
     if (initialBounds.current !== key) {
       map.current.fitBounds(L.latLngBounds(route.coordinates).pad(0.15), { animate: false });

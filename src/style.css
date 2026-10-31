@@ -181,7 +181,14 @@
   .section-heading p { font-size: 14px; }
   .route-cards { grid-template-columns: repeat(3, 1fr); }
   .route-card { min-width: 0; text-align: left; color: var(--ink); }
-  .route-metrics { display: flex; justify-content: space-between; gap: 12px; margin: 24px 0; }
+  .route-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin: 20px 0; }
+  .route-path, .route-note { display: block; margin-top: 10px; font-size: 12px; }
+  .route-card-top h3 { font-size: 17px; }
+  .deadline-summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px 24px; padding: 20px 24px; margin-bottom: 24px; }
+  .deadline-summary small, .deadline-summary strong { display: block; }
+  .deadline-summary small { font-size: 12px; margin-bottom: 6px; }
+  .deadline-summary strong { font-size: 15px; font-weight: 500; }
+  .deadline-summary p { grid-column: 1 / -1; margin: 0; font-size: 12px; }
   .route-metrics strong { display: block; font-size: 21px; font-weight: 500; white-space: nowrap; }
   .route-metrics em { font-size: 13px; font-style: normal; color: var(--muted); }
   .route-metrics small { display: block; font-size: 13px; margin-top: 4px; }
@@ -345,6 +352,7 @@
     .speed-segments { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
+    .deadline-summary { grid-template-columns: 1fr; padding: 18px; }
     .planner-grid, .profile-grid, .saved-list { grid-template-columns: 1fr; }
     .stats { grid-template-columns: repeat(2, 1fr); }
     .route-cards { grid-template-columns: 1fr; }

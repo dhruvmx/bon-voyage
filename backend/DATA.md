@@ -2,7 +2,7 @@
 
 ## Maritime routes
 
-International geometry uses the bundled maritime network in [searoute-py](https://github.com/genthalili/searoute-py), pinned at version 1.6.0. It does not call a live routing API. The planner tries a baseline avoiding the Northwest Passage, then alternatives avoiding Suez, Panama, or Malacca. Identical results are deduplicated; if fewer than three paths exist, speed profiles share geometry. These paths do not certify vessel draft, berth access, canal availability, or navigational suitability.
+International geometry uses the bundled maritime network in [searoute-py](https://github.com/genthalili/searoute-py), pinned at version 1.6.0. It does not call a live routing API. The planner tries a baseline avoiding the Northwest Passage, then alternatives avoiding Suez, Panama, or Malacca. Identical results are deduplicated; speed optimization can select the same geometry for multiple objectives. These paths do not certify vessel draft, berth access, canal availability, or navigational suitability.
 
 California port pairs retain the project's original scenario waypoints. The supported port coordinates are approximate. The map's simplified worldwide coastline is for illustration; see `public/DATA-LICENSE.md` for the repository's attribution.
 
@@ -33,3 +33,11 @@ The manifest uses the highest actionable freshness priority, so a small perishab
 The headline freshness remains a mass-weighted average. Fuel remains based on declared vessel consumption and speed; capacity uses combined cargo weight. No cargo prices or financial loss values are inferred.
 
 Context for calibration: [UC Davis produce fact sheets](https://postharvest.ucdavis.edu/produce-facts), including [apples](https://postharvest.ucdavis.edu/produce-facts-sheets/apple-golden-delicious) and [strawberries](https://postharvest.ucdavis.edu/produce-facts-sheets/strawberry), explain commodity-dependent storage conditions. [FoodSafety.gov's cold-storage chart](https://www.foodsafety.gov/food-safety-charts/cold-food-storage-charts) distinguishes frozen quality horizons from safety. The application does not reproduce those references as validated shipment-specific data; packaging, cultivar, atmosphere, humidity, contamination, and temperature history remain outside this simple model.
+
+### Deadline and speed optimization (deadline-speed-v1)
+
+The arrival window is an upper bound on transit time. For every candidate path, the optimizer searches open-water cruise speeds at 0.01-knot resolution between the declared vessel minimum and maximum. The minimum applies to open water; modeled protected segments use at most 10 knots. No waiting is added to fill the window. Travel time, cubic fuel consumption, cargo quality, and assessed habitat exposure are evaluated together. Reference fuel is the shortest candidate distance at 18 knots and does not change with the deadline.
+
+Among feasible candidates, Recommended balance minimizes newly exhausted cargo tonnage, then the weighted objective. Fastest feasible arrival minimizes duration; Lowest fuel within deadline minimizes fuel and may consume more cargo quality budget, which the interface flags. Legacy mode IDs remain balanced/direct/eco respectively. Duplicate path/speed choices are explicitly labeled. If no candidate meets the deadline, the planner reports infeasibility and the earliest available estimate.
+
+Results include estimated arrival, deadline, slack, speed range, search counts, and optimizer version. Saved voyages and exports retain these values. The optimum is limited to supplied sea paths and this speed grid, with constant declared weather and no live port delays or currents. Tests compare the search against an independent dense calculation and check loose-deadline invariance, binding deadlines, infeasibility, vessel limits, and saved snapshots.

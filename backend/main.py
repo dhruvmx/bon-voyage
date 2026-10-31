@@ -179,11 +179,14 @@ class PlanInput(BaseModel):
     arrival_window:float=Field(default=36,ge=1,le=2160)
     cargo_items:list[CargoItem]|None=Field(default=None,min_length=1,max_length=10)
     max_speed:float=Field(default=24,ge=5,le=35)
+    min_speed:float|None=Field(default=None,ge=5,le=35)
     fuel_per_day:float=Field(default=35,gt=0,le=500)
     whale_activity:float=Field(default=1,ge=.25,le=3)
     departure:str
     @model_validator(mode='after')
     def valid(self):
+        if self.min_speed is None: self.min_speed=min(8,self.max_speed)
+        if self.min_speed>self.max_speed: raise ValueError('Minimum open-water speed cannot exceed maximum speed.')
         ids={x['id'] for x in PORTS}
         if self.origin not in ids or self.destination not in ids or self.origin==self.destination: raise ValueError('Choose two different supported ports.')
         if self.cargo_type not in CARGOS: raise ValueError('Choose a supported cargo category.')
@@ -214,8 +217,14 @@ class Vessel(BaseModel):
     name:str=Field(min_length=2,max_length=100)
     imo:str=Field(default='',max_length=7)
     max_speed:float=Field(default=24,ge=5,le=35)
+    min_speed:float|None=Field(default=None,ge=5,le=35)
     fuel_per_day:float=Field(default=35,gt=0,le=500)
     capacity:float=Field(default=12000,gt=0,le=500000)
+    @model_validator(mode='after')
+    def operating_range(self):
+        if self.min_speed is None: self.min_speed=min(8,self.max_speed)
+        if self.min_speed>self.max_speed: raise ValueError('Minimum open-water speed cannot exceed maximum speed.')
+        return self
     @field_validator('imo')
     @classmethod
     def check_imo(cls,v):
@@ -265,10 +274,11 @@ def voyage_data(p,user):
         with db() as c: vessel=json.loads(owned_record(c,'vessels',p.vessel_id,user)['data'])
         if p.inputs.weight>vessel['capacity']: raise HTTPException(422,'Cargo weight exceeds vessel capacity.')
         if p.inputs.max_speed>vessel['max_speed']: raise HTTPException(422,'Planning speed exceeds vessel maximum speed.')
+        if p.inputs.min_speed<(vessel.get('min_speed') or min(8,vessel['max_speed'])): raise HTTPException(422,'Planning speed is below the vessel minimum open-water speed.')
     result=safe_plan(p.inputs)
     chosen=next((r for r in result['routes'] if r['id']==p.route_id),None)
     if not chosen: raise HTTPException(422,'Choose a valid route.')
-    return {**p.model_dump(),'result':chosen,'data_coverage':result['data_coverage'],'data_mode':result['data_mode']}
+    return {**p.model_dump(),'result':chosen,'data_coverage':result['data_coverage'],'data_mode':result['data_mode'],'optimization':result['optimization'],'deadline_at':result['deadline_at']}
 @app.get('/api/voyages')
 def voyages(user=Depends(current_user)): return list_records('voyages',user)
 @app.post('/api/voyages',status_code=201)
