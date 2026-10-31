@@ -1,251 +1,250 @@
-/* Shared ocean theme: edit tokens here to restyle the entire workspace. */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+/* Edit colors, typography and spacing here. Components share the rules below. */
 :root {
-  --ink: #d9faff;
-  --muted: #8abac6;
-  --background: #061d2b;
-  --surface: #0c3042;
-  --accent: #36d6cf;
-  --tint: #12485a;
-  --border: #236579;
-  --danger: #ff7777;
-  --radius: 2px;
-  --space: 24px;
-  font: 20px/1.35 'VT323', monospace;
-  color: var(--ink);
-  background: var(--background);
-}
-* { box-sizing: border-box; }
-body { margin: 0; }
-button, input, select, textarea { font: inherit; color: inherit; }
-button, a, input, select, textarea { outline-offset: 4px; }
-:focus-visible { outline: 2px solid var(--accent); }
-button { cursor: pointer; }
-button:disabled { opacity: .5; cursor: default; }
-button, input, select, textarea { border-radius: var(--radius); }
-button { background: transparent; border: 1px solid transparent; }
-button:hover:not(:disabled) { background: var(--tint); }
-a { color: var(--accent); }
-h1, h2, h3, p { margin: 0; }
-h1, h2, h3 { font-family: 'Press Start 2P', monospace; line-height: 1.7; font-weight: 400; }
-h1 { font-size: clamp(16px, 2vw, 23px); letter-spacing: 0; }
-h2 { font-size: 13px; }
-h3 { font-size: 11px; }
-p, small { color: var(--muted); }
-p { margin-top: 8px; }
-small { font-size: 18px; }
-svg { flex-shrink: 0; }
-/* Shared surfaces and controls: one treatment across the entire workspace. */
-:is(.panel, .stat, .route-card, .saved-card, .info-box, .empty-state, dialog) {
-  background: var(--surface); border: 2px solid var(--border); border-radius: var(--radius); box-shadow: 4px 4px 0 #041720;
-}
-:is(.stat, .route-card, .saved-card, .info-box, .profile-panel, .profile-edit, .speed-panel, .insights-panel) { padding: var(--space); }
-:is(.button, .small-button, .icon-button, .play-button, .recenter, .swap) {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  border: 1px solid var(--border); padding: 10px 14px; background: var(--surface); font-size: 18px; font-weight: 500;
-}
-.button { color: var(--background); background: var(--accent); border-color: var(--accent); }
-.button:hover:not(:disabled) { background: #12485a; }
-.button.secondary, .button.small.secondary { background: var(--surface); color: var(--ink); border-color: var(--border); }
-.button.secondary:hover { background: var(--tint); }
-.button.full { width: 100%; margin-top: 20px; justify-content: space-between; }
-.button.danger { background: var(--danger); border-color: var(--danger); }
-:is(.icon-button, .play-button, .recenter, .swap) { padding: 9px; }
-.text-button { color: var(--accent); padding: 6px; font-size: 18px; }
-.field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; font-size: 18px; }
-.field > span { font-weight: 500; }
-.field :is(input, select, textarea), .search input {
-  width: 100%; min-width: 0; border: 1px solid var(--border); background: var(--surface); padding: 11px 12px;
-}
-.field textarea { resize: vertical; }
-input[type=range], input[type=checkbox] { accent-color: var(--accent); }
-input[type=range] { width: 100%; cursor: pointer; }
-.two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-:is(.header-actions, .page-title, .section-heading, .panel-heading, .list-toolbar, .saved-actions, .modal-actions, .route-card-top, .route-bottom) {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-}
-:is(.stats, .route-cards, .saved-list, .profile-grid, .planner-grid) { display: grid; gap: var(--space); }
-/* Application shell */
-.sidebar { position: fixed; inset: 0 auto 0 0; width: 216px; padding: 28px 18px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); z-index: 1000; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px; font: 400 13px/1.8 'Press Start 2P', monospace; letter-spacing: -1px; }
-.brand svg { color: var(--accent); }
-.workspace { margin: 36px 4px; overflow-wrap: anywhere; font-size: 18px; }
-nav { display: flex; flex-direction: column; gap: 8px; }
-nav button { display: flex; align-items: center; gap: 12px; padding: 12px; text-align: left; font-size: 18px; }
-nav button.active, .auth-tabs .active { background: var(--tint); color: #55e8df; }
-nav button b { margin-left: auto; font-size: 12px; font-weight: 500; }
-.profile-button { margin-top: auto; padding: 18px 0 0; border-top: 1px solid var(--border); border-radius: 0; display: flex; align-items: center; gap: 10px; text-align: left; }
-.profile-button > span:nth-child(2) { min-width: 0; flex: 1; }
-.profile-button strong, .profile-button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; }
-.avatar { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--tint); border: 1px solid var(--border); border-radius: 50%; font-size: 17px; flex-shrink: 0; }
-.avatar.large { width: 72px; height: 72px; font-size: 24px; margin: 0 auto 20px; }
-main { margin-left: 216px; }
-header { min-height: 72px; padding: 16px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.breadcrumb { color: var(--muted); font-size: 18px; }
-.breadcrumb span { margin: 0 12px; }
-.breadcrumb b { color: var(--ink); font-weight: 500; }
-.page { padding: 36px 32px 0; max-width: 1550px; margin: auto; }
-.page-title { margin-bottom: 32px; }
-.page-title p { font-size: 16px; }
-.eyebrow { color: var(--muted); font-size: 17px; margin-bottom: 12px; }
-footer { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 17px; padding: 24px 0; margin-top: 40px; border-top: 1px solid var(--border); }
-footer > span:first-child { font: 10px 'Press Start 2P', monospace; }
-/* Planner: the map and primary inputs are the focus. */
-.stats { grid-template-columns: repeat(4, 1fr); margin-bottom: 32px; }
-.stat { min-width: 0; }
-.stat-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 18px; color: var(--muted); }
-.stat-label svg { display: none; }
-.stat-number { font-size: 32px; font-weight: 500; margin-top: 12px; letter-spacing: -1px; }
-.stat-number em { font-size: 16px; font-style: normal; font-weight: 400; margin-left: 6px; color: var(--muted); }
-.planner-grid { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
-.panel-heading { padding: 22px 24px; border-bottom: 1px solid var(--border); }
-.panel-heading p { font-size: 18px; }
-.config-body { padding: 24px; }
-.port-pickers { position: relative; margin-bottom: 24px; }
-.swap { position: absolute; right: 10px; top: 81px; padding: 5px; }
-.field-title { font-size: 16px; font-weight: 500; }
-.cargo-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 24px; }
-.cargo-options button { border: 1px solid var(--border); padding: 13px 10px; text-align: left; position: relative; min-height: 52px; }
-.cargo-options strong { display: block; font-weight: 500; font-size: 18px; padding-right: 13px; }
-.cargo-options button.selected, .route-card.selected { border-color: var(--accent); background: var(--tint); }
-.cargo-options svg { position: absolute; right: 8px; top: 8px; color: var(--accent); }
-.range-label { display: flex; justify-content: space-between; font-size: 18px; margin: 8px 0; }
-.range-label strong { font-weight: 500; }
-.advanced { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
-.advanced summary { display: flex; justify-content: space-between; gap: 10px; font-size: 18px; cursor: pointer; list-style: none; }
-.advanced summary::-webkit-details-marker { display: none; }
-.advanced[open] summary { margin-bottom: 24px; }
-.advanced-fields > small { display: block; margin-bottom: 18px; }
-.routes-section { margin-top: 40px; }
-.section-heading { margin-bottom: 20px; }
-.section-heading p { font-size: 18px; }
-.route-cards { grid-template-columns: repeat(3, 1fr); }
-.route-card { min-width: 0; text-align: left; color: var(--ink); }
-.route-metrics { display: flex; justify-content: space-between; gap: 12px; margin: 24px 0; }
-.route-metrics strong { display: block; font-size: 21px; font-weight: 500; white-space: nowrap; }
-.route-metrics em { font-size: 17px; font-style: normal; color: var(--muted); }
-.route-metrics small { display: block; font-size: 17px; margin-top: 4px; }
-.route-bottom { font-size: 17px; color: var(--muted); flex-wrap: wrap; }
-.route-bottom b { color: var(--accent); font-size: 17px; font-weight: 500; }
-.radio { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; flex-shrink: 0; }
-.radio span { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-.speed-panel { margin-top: 24px; }
-.speed-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.speed-segments strong, .speed-segments small { display: block; }
-.speed-segments strong { font-size: 21px; font-weight: 500; margin-bottom: 6px; }
-/* Geographic map: Leaflet owns pan/zoom positioning. */
-.map-wrap { position: relative; isolation: isolate; height: 520px; }
-.map { height: 100%; width: 100%; z-index: 1; }
-.leaflet-container { background: #12566b !important; font-family: inherit; border-radius: 0; }
-.leaflet-control-zoom { border: 1px solid var(--border) !important; box-shadow: none !important; }
-.leaflet-control-zoom a, .leaflet-tooltip { background: var(--surface) !important; color: var(--ink) !important; }
-.leaflet-tooltip { border: 1px solid var(--border); box-shadow: none; font-size: 17px; border-radius: 4px; }
-.leaflet-control-attribution { font-size: 10px !important; }
-.geo-label { white-space: nowrap; font-size: 12px; color: #235062; pointer-events: none; }
-.geo-label.region, .geo-label.ocean { letter-spacing: 2px; color: #497c88; }
-.ship-marker span { display: grid; place-items: center; width: 32px; height: 32px; background: var(--accent); color: white; border: 2px solid white; border-radius: 50%; font-size: 20px; transform: rotate(-35deg); }
-.map-badge, .layer-menu, .tile-error { position: absolute; z-index: 600; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 17px; }
-.map-badge { top: 14px; left: 54px; }
-.layer-menu { top: 14px; right: 14px; }
-.layer-menu label { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
-.recenter { position: absolute; z-index: 500; right: 14px; bottom: 28px; }
-.tile-error { bottom: 24px; left: 14px; max-width: 80%; }
-.map-legend, .playback { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--border); }
-.map-legend { font-size: 17px; color: var(--muted); flex-wrap: wrap; }
-.map-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.map-legend i { width: 14px; height: 3px; }
-.map-legend i.habitat-key { width: 10px; height: 10px; background: #aabc95; border-radius: 50%; }
-.map-legend a { margin-left: auto; }
-.playback input { flex: 1; min-width: 30px; }
-.playback strong, .playback small { display: block; font-size: 17px; }
-.playback b { font-size: 17px; font-weight: 400; }
-/* Account, fleet and saved voyages reuse the same surfaces and field rules. */
-.list-toolbar { margin-bottom: 24px; flex-wrap: wrap; }
-.search { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.search input { border-radius: var(--radius); }
-.saved-list { grid-template-columns: repeat(2, 1fr); }
-.saved-card h3, .saved-notes { overflow-wrap: anywhere; }
-.saved-top { display: flex; justify-content: space-between; margin-bottom: 20px; }
-.stamp { font-size: 17px; color: var(--accent); }
-.saved-metrics, .confirmation { display: flex; gap: 24px; margin: 24px 0; }
-.saved-metrics > span { flex: 1; min-width: 0; }
-.saved-metrics strong, .confirmation strong { display: block; font-size: 24px; font-weight: 500; }
-.saved-metrics small, .confirmation small { display: block; font-size: 17px; margin-top: 6px; overflow-wrap: anywhere; }
-.saved-actions { justify-content: flex-start; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
-.saved-actions .button { margin-right: auto; }
-.vessel-card > svg { color: var(--accent); margin-bottom: 20px; }
-.profile-grid { grid-template-columns: 280px 1fr; align-items: start; }
-.profile-panel { text-align: center; }
-.profile-panel p { overflow-wrap: anywhere; }
-.profile-edit form, .password-form { margin-top: 24px; max-width: 600px; }
-hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
-.info-box { margin-top: 24px; }
-.empty-state { text-align: center; padding: 64px 24px; }
-.empty-state > svg { color: var(--accent); margin-bottom: 20px; }
-.empty-state p { max-width: 480px; margin: 16px auto 24px; }
-.freshness-chart { margin-top: 24px; }
-.freshness-chart > div { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
-.freshness-chart > div > span { width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 18px; }
-.chart-track { flex: 1; background: var(--tint); height: 14px; border-radius: 4px; overflow: hidden; }
-.chart-track i { display: block; height: 100%; }
-/* Feedback and dialogs */
-.error, .warning { background: #fbede7; color: #8d392b; border-radius: var(--radius); padding: 14px; margin: 16px 0; font-size: 18px; }
-.warning { background: #f7f1dd; color: #80662e; }
-.global-error { display: flex; justify-content: space-between; align-items: center; }
-dialog { width: calc(100% - 32px); max-width: 520px; max-height: 90vh; overflow: auto; padding: 32px; color: var(--ink); }
-dialog::backdrop { background: #000c16cc; }
-dialog h2 { font-size: 17px; padding-right: 24px; margin-bottom: 20px; }
-dialog > p { margin-bottom: 24px; }
-.modal-close { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; padding: 6px; }
-.auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin: 24px 0; }
-.auth-tabs button { flex: 1; padding: 12px; }
-.fine-print { font-size: 17px; margin-top: 20px; }
-.modal-actions { justify-content: flex-end; margin-top: 24px; }
-.toast { position: fixed; bottom: 24px; left: calc(50% + 90px); transform: translateX(-50%); z-index: 2000; display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: var(--ink); color: white; border-radius: var(--radius); max-width: 90vw; font-size: 18px; }
-/* Two breakpoints, shared by every page. */
-@media (max-width: 1150px) {
-  .sidebar { width: 76px; padding: 24px 10px; align-items: center; }
-  .brand span, .workspace, nav button span, nav button b, .profile-button > span:nth-child(2), .profile-button > svg { display: none; }
-  nav { margin-top: 40px; width: 100%; }
-  nav button { justify-content: center; padding: 14px 10px; }
-  main { margin-left: 76px; }
-  .profile-button { padding-top: 20px; }
-  .planner-grid { grid-template-columns: minmax(0, 1fr) 320px; }
-  .stats, .route-cards { gap: 16px; }
-  .route-metrics { flex-wrap: wrap; gap: 16px; }
-  .map-legend a { display: none; }
-  .page { padding: 32px 24px 0; }
-}
-@media (max-width: 800px) {
-  .planner-grid, .profile-grid, .saved-list { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .route-cards { grid-template-columns: 1fr; }
-  .route-metrics { flex-wrap: nowrap; }
-  .map-wrap { height: 420px; }
-  .page-title { align-items: flex-start; flex-wrap: wrap; }
-  .page-title > .button { margin-top: 4px; }
-  .speed-segments { grid-template-columns: 1fr; gap: 20px; }
-  .playback { flex-wrap: wrap; }
-  .playback input { flex-basis: 40%; }
-  .sidebar { inset: auto 0 0; width: 100%; height: 66px; padding: 6px; border-right: 0; border-top: 1px solid var(--border); }
-  .brand, .profile-button { display: none; }
-  nav { flex-direction: row; margin: 0; justify-content: space-around; }
-  nav button { flex: 1; flex-direction: column; gap: 4px; padding: 6px 2px; }
-  nav button span { display: block; font-size: 12px; }
-  main { margin-left: 0; padding-bottom: 66px; }
-  header { padding: 14px 20px; }
-  .breadcrumb { display: none; }
-  .header-actions { width: 100%; justify-content: flex-end; }
-  .page { padding: 28px 20px 0; }
-  .stat { padding: 20px 16px; }
-  .stat-number { font-size: 28px; }
-  .stat-label { font-size: 17px; }
-  .map-legend, .playback, .panel-heading { padding: 16px; }
-  .map-legend { gap: 12px; font-size: 12px; }
-  .two-fields { gap: 12px; }
-  .toast { left: 50%; bottom: 80px; width: max-content; }
-  footer { flex-wrap: wrap; }
-  .search { width: 100%; margin-left: 0; }
-  .freshness-chart > div > span { width: 90px; }
-}
-
+    --ink: #000000;
+    --muted: #033e5d;
+    --background: #5d737b;
+    --surface: #fffef8;
+    --accent: #647752;
+    --tint: #eef1e5;
+    --border: #daddd1;
+    --danger: #a91900;
+    --radius: 20%;
+    --space: 24px;
+    font: 16px/1.5 system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--background);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button, a, input, select, textarea { outline-offset: 4px; }
+  :focus-visible { outline: 2px solid var(--accent); }
+  button { cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button, input, select, textarea { border-radius: var(--radius); }
+  button { background: transparent; border: 1px solid transparent; }
+  button:hover:not(:disabled) { background: var(--tint); }
+  a { color: var(--accent); }
+  h1, h2, h3, p { margin: 0; }
+  h1, h2, h3 { line-height: 1.2; font-weight: 600; }
+  h1 { font: 500 clamp(28px, 3vw, 40px)/1.15 Georgia, serif; letter-spacing: -.7px; }
+  h2 { font-size: 20px; }
+  h3 { font-size: 18px; }
+  p, small { color: var(--muted); }
+  p { margin-top: 8px; }
+  small { font-size: 14px; }
+  svg { flex-shrink: 0; }
+  /* Shared surfaces and controls: one treatment across the entire workspace. */
+  :is(.panel, .stat, .route-card, .saved-card, .info-box, .empty-state, dialog) {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  }
+  :is(.stat, .route-card, .saved-card, .info-box, .profile-panel, .profile-edit, .speed-panel, .insights-panel) { padding: var(--space); }
+  :is(.button, .small-button, .icon-button, .play-button, .recenter, .swap) {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    border: 1px solid var(--border); padding: 10px 14px; background: var(--surface); font-size: 14px; font-weight: 500;
+  }
+  .button { color: white; background: var(--accent); border-color: var(--accent); }
+  .button:hover:not(:disabled) { background: #4e613e; }
+  .button.secondary, .button.small.secondary { background: var(--surface); color: var(--ink); border-color: var(--border); }
+  .button.secondary:hover { background: var(--tint); }
+  .button.full { width: 100%; margin-top: 20px; justify-content: space-between; }
+  .button.danger { background: var(--danger); border-color: var(--danger); }
+  :is(.icon-button, .play-button, .recenter, .swap) { padding: 9px; }
+  .text-button { color: var(--accent); padding: 6px; font-size: 14px; }
+  .field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; font-size: 14px; }
+  .field > span { font-weight: 500; }
+  .field :is(input, select, textarea), .search input {
+    width: 100%; min-width: 0; border: 1px solid var(--border); background: var(--surface); padding: 11px 12px;
+  }
+  .field textarea { resize: vertical; }
+  input[type=range], input[type=checkbox] { accent-color: var(--accent); }
+  input[type=range] { width: 100%; cursor: pointer; }
+  .two-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  :is(.header-actions, .page-title, .section-heading, .panel-heading, .list-toolbar, .saved-actions, .modal-actions, .route-card-top, .route-bottom) {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  }
+  :is(.stats, .route-cards, .saved-list, .profile-grid, .planner-grid) { display: grid; gap: var(--space); }
+  /* Application shell */
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: 216px; padding: 28px 18px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--surface); z-index: 1000; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px; font: 600 28px Georgia, serif; letter-spacing: -1px; }
+  .brand svg { color: var(--accent); }
+  .workspace { margin: 36px 4px; overflow-wrap: anywhere; font-size: 14px; }
+  nav { display: flex; flex-direction: column; gap: 8px; }
+  nav button { display: flex; align-items: center; gap: 12px; padding: 12px; text-align: left; font-size: 14px; }
+  nav button.active, .auth-tabs .active { background: var(--tint); color: #405631; }
+  nav button b { margin-left: auto; font-size: 12px; font-weight: 500; }
+  .profile-button { margin-top: auto; padding: 18px 0 0; border-top: 1px solid var(--border); border-radius: 0; display: flex; align-items: center; gap: 10px; text-align: left; }
+  .profile-button > span:nth-child(2) { min-width: 0; flex: 1; }
+  .profile-button strong, .profile-button small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .avatar { display: inline-grid; place-items: center; width: 36px; height: 36px; background: var(--tint); border: 1px solid var(--border); border-radius: 50%; font-size: 13px; flex-shrink: 0; }
+  .avatar.large { width: 72px; height: 72px; font-size: 24px; margin: 0 auto 20px; }
+  main { margin-left: 216px; }
+  header { min-height: 72px; padding: 16px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .breadcrumb { color: var(--muted); font-size: 14px; }
+  .breadcrumb span { margin: 0 12px; }
+  .breadcrumb b { color: var(--ink); font-weight: 500; }
+  .page { padding: 36px 32px 0; max-width: 1550px; margin: auto; }
+  .page-title { margin-bottom: 32px; }
+  .page-title p { font-size: 16px; }
+  .eyebrow { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+  footer { display: flex; justify-content: space-between; gap: 16px; color: var(--muted); font-size: 13px; padding: 24px 0; margin-top: 40px; border-top: 1px solid var(--border); }
+  footer > span:first-child { font: 20px Georgia, serif; }
+  /* Planner: the map and primary inputs are the focus. */
+  .stats { grid-template-columns: repeat(4, 1fr); margin-bottom: 32px; }
+  .stat { min-width: 0; }
+  .stat-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; color: var(--muted); }
+  .stat-label svg { display: none; }
+  .stat-number { font-size: 32px; font-weight: 500; margin-top: 12px; letter-spacing: -1px; }
+  .stat-number em { font-size: 16px; font-style: normal; font-weight: 400; margin-left: 6px; color: var(--muted); }
+  .planner-grid { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; }
+  .panel-heading { padding: 22px 24px; border-bottom: 1px solid var(--border); }
+  .panel-heading p { font-size: 14px; }
+  .config-body { padding: 24px; }
+  .port-pickers { position: relative; margin-bottom: 24px; }
+  .swap { position: absolute; right: 10px; top: 81px; padding: 5px; }
+  .field-title { font-size: 16px; font-weight: 500; }
+  .cargo-options { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 24px; }
+  .cargo-options button { border: 1px solid var(--border); padding: 13px 10px; text-align: left; position: relative; min-height: 52px; }
+  .cargo-options strong { display: block; font-weight: 500; font-size: 14px; padding-right: 13px; }
+  .cargo-options button.selected, .route-card.selected { border-color: var(--accent); background: var(--tint); }
+  .cargo-options svg { position: absolute; right: 8px; top: 8px; color: var(--accent); }
+  .range-label { display: flex; justify-content: space-between; font-size: 14px; margin: 8px 0; }
+  .range-label strong { font-weight: 500; }
+  .advanced { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+  .advanced summary { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; cursor: pointer; list-style: none; }
+  .advanced summary::-webkit-details-marker { display: none; }
+  .advanced[open] summary { margin-bottom: 24px; }
+  .advanced-fields > small { display: block; margin-bottom: 18px; }
+  .routes-section { margin-top: 40px; }
+  .section-heading { margin-bottom: 20px; }
+  .section-heading p { font-size: 14px; }
+  .route-cards { grid-template-columns: repeat(3, 1fr); }
+  .route-card { min-width: 0; text-align: left; color: var(--ink); }
+  .route-metrics { display: flex; justify-content: space-between; gap: 12px; margin: 24px 0; }
+  .route-metrics strong { display: block; font-size: 21px; font-weight: 500; white-space: nowrap; }
+  .route-metrics em { font-size: 13px; font-style: normal; color: var(--muted); }
+  .route-metrics small { display: block; font-size: 13px; margin-top: 4px; }
+  .route-bottom { font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .route-bottom b { color: var(--accent); font-size: 13px; font-weight: 500; }
+  .radio { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 50%; flex-shrink: 0; }
+  .radio span { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .speed-panel { margin-top: 24px; }
+  .speed-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .speed-segments strong, .speed-segments small { display: block; }
+  .speed-segments strong { font-size: 21px; font-weight: 500; margin-bottom: 6px; }
+  /* Geographic map: Leaflet owns pan/zoom positioning. */
+  .map-wrap { position: relative; isolation: isolate; height: 520px; }
+  .map { height: 100%; width: 100%; z-index: 1; }
+  .leaflet-container { background: #dfe7d7 !important; font-family: inherit; border-radius: 0; }
+  .leaflet-control-zoom { border: 1px solid var(--border) !important; box-shadow: none !important; }
+  .leaflet-control-zoom a, .leaflet-tooltip { background: var(--surface) !important; color: var(--ink) !important; }
+  .leaflet-tooltip { border: 1px solid var(--border); box-shadow: none; font-size: 13px; border-radius: 4px; }
+  .leaflet-control-attribution { font-size: 10px !important; }
+  .geo-label { white-space: nowrap; font-size: 12px; color: #727c66; pointer-events: none; }
+  .geo-label.region, .geo-label.ocean { letter-spacing: 2px; color: #8a957f; }
+  .ship-marker span { display: grid; place-items: center; width: 32px; height: 32px; background: var(--accent); color: white; border: 2px solid white; border-radius: 50%; font-size: 20px; transform: rotate(-35deg); }
+  .map-badge, .layer-menu, .tile-error { position: absolute; z-index: 600; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; }
+  .map-badge { top: 14px; left: 54px; }
+  .layer-menu { top: 14px; right: 14px; }
+  .layer-menu label { display: flex; align-items: center; gap: 8px; padding: 7px 0; }
+  .recenter { position: absolute; z-index: 500; right: 14px; bottom: 28px; }
+  .tile-error { bottom: 24px; left: 14px; max-width: 80%; }
+  .map-legend, .playback { display: flex; align-items: center; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--border); }
+  .map-legend { font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+  .map-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .map-legend i { width: 14px; height: 3px; }
+  .map-legend i.habitat-key { width: 10px; height: 10px; background: #aabc95; border-radius: 50%; }
+  .map-legend a { margin-left: auto; }
+  .playback input { flex: 1; min-width: 30px; }
+  .playback strong, .playback small { display: block; font-size: 13px; }
+  .playback b { font-size: 13px; font-weight: 400; }
+  /* Account, fleet and saved voyages reuse the same surfaces and field rules. */
+  .list-toolbar { margin-bottom: 24px; flex-wrap: wrap; }
+  .search { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .search input { border-radius: var(--radius); }
+  .saved-list { grid-template-columns: repeat(2, 1fr); }
+  .saved-card h3, .saved-notes { overflow-wrap: anywhere; }
+  .saved-top { display: flex; justify-content: space-between; margin-bottom: 20px; }
+  .stamp { font-size: 13px; color: var(--accent); }
+  .saved-metrics, .confirmation { display: flex; gap: 24px; margin: 24px 0; }
+  .saved-metrics > span { flex: 1; min-width: 0; }
+  .saved-metrics strong, .confirmation strong { display: block; font-size: 24px; font-weight: 500; }
+  .saved-metrics small, .confirmation small { display: block; font-size: 13px; margin-top: 6px; overflow-wrap: anywhere; }
+  .saved-actions { justify-content: flex-start; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }
+  .saved-actions .button { margin-right: auto; }
+  .vessel-card > svg { color: var(--accent); margin-bottom: 20px; }
+  .profile-grid { grid-template-columns: 280px 1fr; align-items: start; }
+  .profile-panel { text-align: center; }
+  .profile-panel p { overflow-wrap: anywhere; }
+  .profile-edit form, .password-form { margin-top: 24px; max-width: 600px; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
+  .info-box { margin-top: 24px; }
+  .empty-state { text-align: center; padding: 64px 24px; }
+  .empty-state > svg { color: var(--accent); margin-bottom: 20px; }
+  .empty-state p { max-width: 480px; margin: 16px auto 24px; }
+  .freshness-chart { margin-top: 24px; }
+  .freshness-chart > div { display: flex; align-items: center; gap: 16px; margin: 16px 0; }
+  .freshness-chart > div > span { width: 160px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; }
+  .chart-track { flex: 1; background: var(--tint); height: 14px; border-radius: 4px; overflow: hidden; }
+  .chart-track i { display: block; height: 100%; }
+  /* Feedback and dialogs */
+  .error, .warning { background: #fbede7; color: #8d392b; border-radius: var(--radius); padding: 14px; margin: 16px 0; font-size: 14px; }
+  .warning { background: #f7f1dd; color: #80662e; }
+  .global-error { display: flex; justify-content: space-between; align-items: center; }
+  dialog { width: calc(100% - 32px); max-width: 520px; max-height: 90vh; overflow: auto; padding: 32px; color: var(--ink); }
+  dialog::backdrop { background: #252c2359; }
+  dialog h2 { font-size: 28px; padding-right: 24px; margin-bottom: 20px; }
+  dialog > p { margin-bottom: 24px; }
+  .modal-close { position: absolute; right: 14px; top: 14px; display: grid; place-items: center; padding: 6px; }
+  .auth-tabs { display: flex; border-bottom: 1px solid var(--border); margin: 24px 0; }
+  .auth-tabs button { flex: 1; padding: 12px; }
+  .fine-print { font-size: 13px; margin-top: 20px; }
+  .modal-actions { justify-content: flex-end; margin-top: 24px; }
+  .toast { position: fixed; bottom: 24px; left: calc(50% + 90px); transform: translateX(-50%); z-index: 2000; display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: var(--ink); color: white; border-radius: var(--radius); max-width: 90vw; font-size: 14px; }
+  /* Two breakpoints, shared by every page. */
+  @media (max-width: 1150px) {
+    .sidebar { width: 76px; padding: 24px 10px; align-items: center; }
+    .brand span, .workspace, nav button span, nav button b, .profile-button > span:nth-child(2), .profile-button > svg { display: none; }
+    nav { margin-top: 40px; width: 100%; }
+    nav button { justify-content: center; padding: 14px 10px; }
+    main { margin-left: 76px; }
+    .profile-button { padding-top: 20px; }
+    .planner-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+    .stats, .route-cards { gap: 16px; }
+    .route-metrics { flex-wrap: wrap; gap: 16px; }
+    .map-legend a { display: none; }
+    .page { padding: 32px 24px 0; }
+  }
+  @media (max-width: 800px) {
+    .planner-grid, .profile-grid, .saved-list { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .route-cards { grid-template-columns: 1fr; }
+    .route-metrics { flex-wrap: nowrap; }
+    .map-wrap { height: 420px; }
+    .page-title { align-items: flex-start; flex-wrap: wrap; }
+    .page-title > .button { margin-top: 4px; }
+    .speed-segments { grid-template-columns: 1fr; gap: 20px; }
+    .playback { flex-wrap: wrap; }
+    .playback input { flex-basis: 40%; }
+    .sidebar { inset: auto 0 0; width: 100%; height: 66px; padding: 6px; border-right: 0; border-top: 1px solid var(--border); }
+    .brand, .profile-button { display: none; }
+    nav { flex-direction: row; margin: 0; justify-content: space-around; }
+    nav button { flex: 1; flex-direction: column; gap: 4px; padding: 6px 2px; }
+    nav button span { display: block; font-size: 12px; }
+    main { margin-left: 0; padding-bottom: 66px; }
+    header { padding: 14px 20px; }
+    .breadcrumb { display: none; }
+    .header-actions { width: 100%; justify-content: flex-end; }
+    .page { padding: 28px 20px 0; }
+    .stat { padding: 20px 16px; }
+    .stat-number { font-size: 28px; }
+    .stat-label { font-size: 13px; }
+    .map-legend, .playback, .panel-heading { padding: 16px; }
+    .map-legend { gap: 12px; font-size: 12px; }
+    .two-fields { gap: 12px; }
+    .toast { left: 50%; bottom: 80px; width: max-content; }
+    footer { flex-wrap: wrap; }
+    .search { width: 100%; margin-left: 0; }
+    .freshness-chart > div > span { width: 90px; }
+  }
+  
