@@ -40,11 +40,11 @@ export default function VoyageMap({
       return r.json();
     }).then(data => {
       if (!active) return;
-      L.geoJSON(data, {pane:'land', interactive:false, style:{color:'#9b9d78',weight:1.2,fillColor:'#f1e7c8',fillOpacity:1}}).addTo(instance);
+      L.geoJSON(data, {pane:'land', interactive:false, style:{color:'var(--border)',weight:1.2,fillColor:'var(--map-land)',fillOpacity:1}}).addTo(instance);
     }).catch(() => active && setTileError(true));
     instance.attributionControl.addAttribution('<a href="https://www.naturalearthdata.com/">Natural Earth</a> · Public domain');
-    for (let lat=30;lat<=43;lat++) L.polyline([[lat,-132],[lat,-114]],{color:'#a6b8a2',weight:.5,opacity:.6,interactive:false}).addTo(instance);
-    for (let lon=-130;lon<=-115;lon++) L.polyline([[29,lon],[44,lon]],{color:'#a6b8a2',weight:.5,opacity:.6,interactive:false}).addTo(instance);
+    for (let lat=30;lat<=43;lat++) L.polyline([[lat,-132],[lat,-114]],{color:'var(--map-grid)',weight:.5,opacity:.6,interactive:false}).addTo(instance);
+    for (let lon=-130;lon<=-115;lon++) L.polyline([[29,lon],[44,lon]],{color:'var(--map-grid)',weight:.5,opacity:.6,interactive:false}).addTo(instance);
     const labels=[['CALIFORNIA',36.2,-119.3,'region'],['NORTH PACIFIC OCEAN',35.7,-124.7,'ocean'],['San Francisco',37.8,-122.4,'city'],['Monterey',36.6,-121.9,'city'],['Santa Barbara',34.42,-119.7,'city'],['Los Angeles',34.05,-118.24,'city'],['San Diego',32.72,-117.16,'city'],['Humboldt Bay',40.8,-124.16,'city']];
     labels.forEach(([name,lat,lon,type]) => L.marker([lat,lon],{pane:'markerPane',interactive:false,icon:L.divIcon({className:'geo-label '+type,html:name,iconSize:[140,18],iconAnchor:[0,9]})}).addTo(instance));
     const resize = new ResizeObserver(() => instance.invalidateSize());
@@ -65,8 +65,8 @@ export default function VoyageMap({
       .forEach((z) =>
         L.circle([z.lat, z.lon], {
           radius: z.radius_nm * 1852,
-          color: z.kind === "vsr" ? "#a77a2b" : "#5c7448",
-          fillColor: z.kind === "vsr" ? "#e8ad48" : "#99af78",
+          color: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
+          fillColor: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
           fillOpacity: 0.22,
           dashArray: "6 5",
           weight: 2,
@@ -81,7 +81,7 @@ export default function VoyageMap({
         .filter((r) => r.id !== route.id)
         .forEach((r) =>
           L.polyline(r.coordinates, {
-            color: "#6b7468",
+            color: "var(--muted)",
             weight: 2,
             dashArray: "5 8",
             opacity: 0.5,
@@ -89,7 +89,7 @@ export default function VoyageMap({
             .bindTooltip(r.name)
             .addTo(group),
         );
-    L.polyline(route.coordinates, { color: "#fff9e7", weight: 9 }).addTo(group);
+    L.polyline(route.coordinates, { color: "var(--surface)", weight: 9 }).addTo(group);
     L.polyline(route.coordinates, { color, weight: 5 })
       .bindTooltip(`${route.name} · ${route.speed} kn open water`)
       .addTo(group);
@@ -98,20 +98,20 @@ export default function VoyageMap({
     route.segments.forEach((s, i) => {
       if (s.kind !== lastKind && chunk.length) {
         if (lastKind !== "open")
-          L.polyline(chunk, { color: "#d59034", weight: 5 }).addTo(group);
+          L.polyline(chunk, { color: "var(--protected)", weight: 5 }).addTo(group);
         chunk = [];
       }
       chunk.push(s.from, s.to);
       lastKind = s.kind;
       if (i === route.segments.length - 1 && s.kind !== "open")
-        L.polyline(chunk, { color: "#d59034", weight: 5 }).addTo(group);
+        L.polyline(chunk, { color: "var(--protected)", weight: 5 }).addTo(group);
     });
     [route.coordinates[0], route.coordinates.at(-1)].forEach((p, i) =>
       L.circleMarker(p, {
         radius: 7,
-        color: "#24221d",
+        color: "var(--ink)",
         weight: 2,
-        fillColor: i ? "#e8ad48" : "#faf0d2",
+        fillColor: i ? "var(--protected)" : "var(--surface)",
         fillOpacity: 1,
       })
         .bindTooltip(i ? "Destination port" : "Departure port", {
@@ -219,7 +219,7 @@ export default function VoyageMap({
           <i style={{ background: color }} /> Open water
         </span>
         <span>
-          <i style={{ background: "#d59034" }} /> 10 kn protected transit
+          <i style={{ background: "var(--protected)" }} /> 10 kn protected transit
         </span>
         <span>
           <i className="habitat-key" /> Whale habitat
