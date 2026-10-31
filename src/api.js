@@ -15,6 +15,9 @@ export async function api(path, options = {}) {
   }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 401 && !["/auth/login", "/auth/signup", "/auth/me"].includes(path)) {
+      window.dispatchEvent(new Event("bon-voyage-session-expired"));
+    }
     const detail = data?.detail;
     const error = new Error(
       Array.isArray(detail)

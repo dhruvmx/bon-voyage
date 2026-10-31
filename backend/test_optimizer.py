@@ -7,6 +7,11 @@ from backend.optimizer import search_passages
 from backend.cargo_model import score_route
 
 
+def full_records(client):
+    page=client.get('/api/voyages?limit=100').json()
+    return [client.get('/api/voyages/'+item['id']).json() for item in page['items']]
+
+
 class OptimizerTests(unittest.TestCase):
     def plan(self, **changes):
         return calculate(PlanInput(departure='2026-11-01T00:00:00Z',
@@ -72,7 +77,7 @@ class OptimizerTests(unittest.TestCase):
                     if hours>36: continue
                     fuel=sum(p.fuel_per_day/24*((zone_speed if seg['zone'] else speed)/18)**3
                              *seg['distance']/(zone_speed if seg['zone'] else speed) for seg in path['segments'])
-                    protection=max(0,100-path['whale_distance']*(zone_speed/10)**2/path['distance']*100*p.whale_activity)
+                    protection=100*50/(50+path['whale_distance']*(zone_speed/10)**2*p.whale_activity)
                     score,expired,_=score_route({'hours':hours,'fuel':fuel,'protection':protection,
                                                 'cargo_results':cargo_outcomes(p,hours)},ref,True)
                     oracle.append((expired,score,hours,fuel,path['id'],speed,zone_speed))
@@ -149,9 +154,9 @@ class OptimizerTests(unittest.TestCase):
                     inputs['min_speed']=12
                     response=client.post('/api/voyages',json=body)
                     self.assertEqual(response.status_code,201,response.text)
-                    saved=client.get('/api/voyages').json()[0]
+                    saved=full_records(client)[0]
                     self.assertEqual(saved['inputs']['min_speed'],12)
-                    self.assertEqual(saved['optimization']['version'],'deadline-speed-v2')
+                    self.assertEqual(saved['optimization']['version'],'deadline-speed-v3')
                     self.assertIn('deadline_at',saved)
                     self.assertGreater(saved['result']['slack_hours'],0)
                     inputs['fuel_per_day']=1

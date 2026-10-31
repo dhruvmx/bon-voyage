@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { api, download } from "./api";
 import VoyageMap from "./Map";
+import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
 import Intro from "./Intro";
 import SidebarControls from "./SidebarControls";
@@ -118,10 +119,11 @@ function Modal({ title, eyebrow, children, onClose }) {
   );
 }
 function Field({ label, children, ...props }) {
+  const id = useId();
   return (
     <label className="field">
-      <span>{label}</span>
-      {children || <input {...props} />}
+      <span id={id}>{label}</span>
+      {children ? cloneElement(children, { "aria-labelledby": id }) : <input {...props} aria-labelledby={id} />}
     </label>
   );
 }
@@ -168,6 +170,20 @@ export default function App() {
     [notes, setNotes] = useState(""),
     [voyageStatus, setVoyageStatus] = useState("Planned");
   const [saving, setSaving] = useState(false);
+  const [routeHighlight, setRouteHighlight] = useState(0);
+  const preview = useRef(null);
+  const showRouteOnMap = (id) => {
+    if (id) setSelected(id);
+    setRouteHighlight((n) => n + 1);
+    preview.current?.scrollIntoView({ block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  };
+  const [voyagePage, setVoyagePage] = useState({ total: 0, has_more: false }),
+    [vesselPage, setVesselPage] = useState({ total: 0, has_more: false }),
+    [stats, setStats] = useState(null),
+    [loadingLists, setLoadingLists] = useState(false),
+    [loadingMore, setLoadingMore] = useState("");
+  const listRequest = useRef(0), account = useRef(null), assignedVessel = useRef(""), expiredDraft = useRef(null), paging = useRef(false);
+  account.current = user?.id; assignedVessel.current = vesselId;
   const [modal, setModal] = useState(null),
     [authMode, setAuthMode] = useState("signup"),
     [toast, setToast] = useState(""),
@@ -188,16 +204,67 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(""), 4500);
   }, []);
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+  useEffect(() => {
+    const expired = () => {
+      if (!account.current) return;
+      expiredDraft.current = { owner: account.current, editingId, vesselId };
+      account.current = null; ++listRequest.current;
+      setUser(null); setVoyages([]); setVessels([]); setStats(null);
+      setVesselId(""); setEditingId(null); setView("planner");
+      setAuthMode("login"); setModal("auth");
+      notify("Your session expired. Log in to continue; your draft is preserved.");
+    };
+    window.addEventListener("bon-voyage-session-expired", expired);
+    return () => window.removeEventListener("bon-voyage-session-expired", expired);
+  }, [notify, editingId, vesselId]);
   const refresh = useCallback(async () => {
+    if (!user) return;
+    const n = ++listRequest.current, owner = user.id;
+    setLoadingLists(true);
     try {
-      const [vs, ss] = await Promise.all([api("/voyages"), api("/vessels")]);
-      setVoyages(vs);
-      setVessels(ss);
-      setDataError("");
+      const [vs, ss, totals] = await Promise.all([
+        api(`/voyages?limit=20&q=${encodeURIComponent(query)}`),
+        api("/vessels?limit=20"), api("/voyages/stats"),
+      ]);
+      if (n !== listRequest.current || owner !== account.current) return;
+      // Fetch a current off-page vessel instead of retaining stale specifications.
+      let ships = ss.items;
+      const selected = assignedVessel.current;
+      if (selected && !ships.some((v) => v.id === selected)) {
+        try { ships = [...ships, await api(`/vessels/${selected}`)]; }
+        catch (e) { if (e.status !== 404) throw e; }
+      }
+      if (n !== listRequest.current || owner !== account.current) return;
+      setVessels(ships);
+      setVoyages(vs.items); setVoyagePage(vs); setVesselPage(ss);
+      setStats(totals); setDataError("");
     } catch (e) {
-      setDataError(e.message);
+      if (n === listRequest.current && owner === account.current) setDataError(e.message);
+    } finally {
+      if (n === listRequest.current) setLoadingLists(false);
     }
-  }, []);
+  }, [user?.id, query]);
+  async function loadMore(type) {
+    if (paging.current || loadingLists) return;
+    const page = type === "voyages" ? voyagePage : vesselPage;
+    const offset = page.offset + page.items.length;
+    const n = listRequest.current, owner = account.current;
+    paging.current = true; setLoadingMore(type);
+    try {
+      const next = await api(`/${type}?limit=20&offset=${offset}${type === "voyages" ? `&q=${encodeURIComponent(query)}` : ""}`);
+      if (n !== listRequest.current || owner !== account.current) return;
+      const update = type === "voyages" ? setVoyages : setVessels;
+      update((previous) => [...previous, ...next.items.filter((item) => !previous.some((p) => p.id === item.id))]);
+      (type === "voyages" ? setVoyagePage : setVesselPage)(next);
+    } catch (e) {
+      if (n === listRequest.current && owner === account.current) setDataError(e.message);
+    } finally { paging.current = false; setLoadingMore(""); }
+  }
+  async function exportVoyage(v) {
+    const owner = account.current;
+    try { const full = await api(`/voyages/${v.id}`); if (owner === account.current) download(full); }
+    catch (e) { setDataError(e.message); }
+  }
   useEffect(() => {
     let active = true;
     api("/catalog")
@@ -214,10 +281,15 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (user) refresh();
-    else {
+    if (user) {
+      ++listRequest.current; setLoadingLists(true);
+      const timer = setTimeout(refresh, query ? 250 : 0);
+      return () => { clearTimeout(timer); ++listRequest.current; };
+    } else {
+      ++listRequest.current; setStats(null); setLoadingLists(false);
       setVoyages([]);
       setVessels([]);
+      setVoyagePage({ total: 0, has_more: false }); setVesselPage({ total: 0, has_more: false });
     }
   }, [user?.id, refresh]);
   useEffect(() => {
@@ -306,18 +378,27 @@ export default function App() {
       return { ...previous, max_speed: maximum, min_speed: cruiseMinimum, fuel_per_day: vessel.fuel_per_day };
     });
   }, [vessels, vesselId, inputs.max_speed, inputs.min_speed, inputs.fuel_per_day]);
-  const loadVoyage = (v) => {
-    desiredRoute.current = v.route_id;
-    setInputs(v.inputs);
-    setVesselId(vessels.some(s => s.id === v.vessel_id) ? v.vessel_id : "");
-    setEditingId(v.id);
-    setVoyageName(v.name);
-    setNotes(v.notes);
-    setVoyageStatus(v.status);
-    setView("planner");
-    notify("Voyage loaded. Adjust inputs and save to update it.");
-  };
+  async function loadVoyage(summary) {
+    const owner = account.current;
+    try {
+      const v = await api(`/voyages/${summary.id}`);
+      if (owner !== account.current) return;
+      if (v.vessel_id && !vessels.some((ship) => ship.id === v.vessel_id)) {
+        try {
+          const ship = await api(`/vessels/${v.vessel_id}`);
+          if (owner !== account.current) return;
+          setVessels((previous) => previous.some((s) => s.id === ship.id) ? previous : [...previous, ship]);
+        } catch (e) { if (e.status !== 404) throw e; v.vessel_id = null; }
+      }
+      if (owner !== account.current) return;
+      desiredRoute.current = v.route_id; setInputs(v.inputs);
+      setVesselId(v.vessel_id || ""); setEditingId(v.id);
+      setVoyageName(v.name); setNotes(v.notes); setVoyageStatus(v.status);
+      setView("planner"); notify("Voyage loaded. Adjust inputs and save to update it.");
+    } catch (e) { if (owner === account.current) setDataError(e.message); }
+  }
   const newVoyage = () => {
+    expiredDraft.current = null;
     setInputs(freshInputs());
     setEditingId(null);
     setVoyageName("");
@@ -403,7 +484,7 @@ export default function App() {
             >
               <Icon size={18} />
               <span>{label}</span>
-              {id === "voyages" && <b>{voyages.length}</b>}
+              {id === "voyages" && <b>{stats?.total ?? voyages.length}</b>}
             </button>
           ))}
         </nav>
@@ -577,18 +658,10 @@ export default function App() {
                   icon={Clock}
                 />
                 <Stat
-                  label="Fuel use"
-                  value={
-                    route
-                      ? (route.fuel_delta > 0 ? "+" : "") + route.fuel_delta
-                      : "—"
-                  }
-                  unit="%"
-                  sub={
-                    route
-                      ? `${route.fuel.toFixed(1)} t fuel · ${route.co2.toFixed(1)} t CO₂`
-                      : "Speed-adjusted consumption"
-                  }
+                  label="Estimated fuel"
+                  value={route ? route.fuel.toFixed(1) : "—"}
+                  unit="t"
+                  sub={route ? `${route.co2.toFixed(1)} t CO₂ · modeled consumption` : "Speed-adjusted consumption"}
                   icon={BarChart3}
                 />
                 <Stat
@@ -601,8 +674,9 @@ export default function App() {
                 />
               </section>
               <div className="planner-grid">
-                <div>
+                <div className="passage-preview" ref={preview}>
                   <VoyageMap
+                    highlightToken={routeHighlight}
                     route={route}
                     routes={result?.routes || []}
                     zones={catalog.zones}
@@ -613,6 +687,7 @@ export default function App() {
                     playing={playing}
                     setPlaying={setPlaying}
                   />
+                  <RouteComparison result={result} selected={selected} calculating={calculating} onSelect={showRouteOnMap} onShowMap={() => showRouteOnMap()} />
                 </div>
                 <section className="panel config">
                   <div className="panel-heading">
@@ -716,6 +791,7 @@ export default function App() {
                             ))}
                           </select>
                         </Field>
+                        {user && vesselPage.has_more && <button type="button" className="text-button" disabled={loadingLists || Boolean(loadingMore)} onClick={() => loadMore("vessels")}>Load more vessels</button>}
                         {!user && (
                           <small>
                             Sign up to add and assign your own vessels.
@@ -754,6 +830,7 @@ export default function App() {
                         <Field label="Departure (your local time)">
                           <input
                             type="datetime-local"
+                            min="1900-01-01T00:00" max="2100-12-31T23:59"
                             value={new Date(
                               new Date(inputs.departure).getTime() -
                                 new Date(inputs.departure).getTimezoneOffset() *
@@ -840,68 +917,6 @@ export default function App() {
                   <tbody>{route.cargo_results.map((item, index) => <tr key={index}><th scope="row">{item.name}</th><td>{item.weight.toLocaleString()} t</td><td className={item.freshness < 70 ? "cargo-at-risk" : ""}>{item.freshness.toFixed(1)}%</td><td>{item.perishable === false || item.profile === "electronics" ? "Non-perishable" : formatHours(Math.floor(item.shelf_remaining))}</td></tr>)}</tbody>
                 </table></div>
               </section>}
-              <section className="routes-section">
-                <div className="section-heading">
-                  <div>
-                    <h2>Compare routes</h2>
-                    <p>
-                      Choose the passage that fits your cargo.
-                    </p>
-                  </div>
-                  <span className="stamp">
-                    {calculating ? "Optimizing path and speed…" : result?.status === "infeasible" ? "No deadline-feasible passage" : `3 options · ${result?.distinct_paths || 0} candidate sea paths`}
-                  </span>
-                </div>
-                <div className="route-cards">
-                  {result?.routes.filter((option) => result.status !== "infeasible" || option.id === result.recommended).map((r) => (
-                    <button
-                      key={r.id}
-                      className={
-                        "route-card " + (selected === r.id ? "selected" : "")
-                      }
-                      onClick={() => setSelected(r.id)}
-                      aria-pressed={selected === r.id}
-                    >
-                      <div className="route-card-top">
-                        <h3>{r.name}</h3>
-                        <span className="radio">
-                          {selected === r.id && <span />}
-                        </span>
-                      </div>
-                      <small className="route-path">{r.path_name} · {r.speed.toFixed(2)} kn open water{r.protected_distance > 0 ? ` · ${r.protected_speed.toFixed(2)} kn protected` : ""}</small>
-                      <div className="route-metrics">
-                        <div>
-                          <strong>
-                            {formatDuration(r.hours)}
-                          </strong>
-                          <small>Estimated duration</small>
-                        </div>
-                        <div><strong>{r.fuel.toFixed(1)}<em> t</em></strong><small>Estimated fuel</small></div>
-                        <div>
-                          <strong>{r.freshness.toFixed(1)}%</strong>
-                          <small>Freshness</small>
-                        </div>
-                        <div>
-                          <strong>
-                            {whaleAssessed(r, inputs) ? Math.round(r.protection) : "N/A"}
-                            {whaleAssessed(r, inputs) && <em>/100</em>}
-                          </strong>
-                          <small>Whale assessment</small>
-                        </div>
-                      </div>
-                      <div className="route-bottom">
-                        <span>
-                          {r.distance} nm ·{" "}
-                          {r.feasible ? `${formatDuration(r.slack_hours)} before deadline` : `${formatDuration(-r.slack_hours)} past deadline`}
-                        </span>
-                        {result.recommended === r.id && <b>{result.status === "infeasible" ? "Earliest available" : "Recommended ↗"}</b>}
-                      </div>
-                      {r.same_as && <small className="route-note">Same path and speed as {result.routes.find((option) => option.id === r.same_as)?.name.toLowerCase()}.</small>}
-                      {r.newly_expired_tonnes > 0 && <small className="route-note cargo-at-risk">{r.newly_expired_tonnes.toLocaleString()} t would exhaust its quality budget.</small>}
-                    </button>
-                  ))}
-                </div>
-              </section>
               {route && (
                 <section className="panel speed-panel">
                   <div className="speed-segments">
@@ -921,6 +936,7 @@ export default function App() {
                 onLogout={async () => {
                   try {
                     await api("/auth/logout", { method: "POST" });
+                    expiredDraft.current = null;
                     setUser(null);
                     setView("planner");
                     setVesselId("");
@@ -950,8 +966,8 @@ export default function App() {
             <>
               <div className="list-toolbar">
                 <h2>
-                  {voyages.length} saved{" "}
-                  {voyages.length === 1 ? "voyage" : "voyages"}
+                  {voyagePage.total} saved{" "}
+                  {voyagePage.total === 1 ? "voyage" : "voyages"}
                 </h2>
                 <div className="search">
                   <Search size={15} />
@@ -973,19 +989,14 @@ export default function App() {
               {!voyages.length ? (
                 <Empty
                   icon={Flag}
-                  title="Your next passage starts here."
-                  text="Plan a voyage, select a route, and save it to your account."
+                  title={query ? "No matching voyages." : "Your next passage starts here."}
+                  text={query ? "Try another voyage or cargo name." : "Plan a voyage, select a route, and save it to your account."}
                   action="Plan a voyage"
                   onClick={newVoyage}
                 />
               ) : (
                 <div className="saved-list">
                   {voyages
-                    .filter((v) =>
-                      (v.name + " " + v.inputs.cargo_name + " " + (v.inputs.cargo_items || []).map((item) => item.name).join(" "))
-                        .toLowerCase()
-                        .includes(query.toLowerCase()),
-                    )
                     .map((v) => (
                       <article className="saved-card" key={v.id}>
                         <div className="saved-top">
@@ -1032,7 +1043,7 @@ export default function App() {
                           <button
                             className="icon-button"
                             aria-label={"Export " + v.name}
-                            onClick={() => download(v)}
+                            onClick={() => exportVoyage(v)}
                           >
                             <Download size={16} />
                           </button>
@@ -1058,7 +1069,7 @@ export default function App() {
           ) : view === "fleet" ? (
             <>
               <div className="list-toolbar">
-                <h2>{vessels.length} vessels in your fleet</h2>
+                <h2>{vesselPage.total} vessels in your fleet</h2>
                 <button
                   className="button"
                   onClick={() => setModal({ type: "vessel", item: null })}
@@ -1133,8 +1144,11 @@ export default function App() {
               )}
             </>
           ) : (
-            <Insights voyages={voyages} onPlan={newVoyage} />
+            <Insights voyages={voyages} stats={stats} onPlan={newVoyage} />
           )}
+          {user && loadingLists && <p role="status">Loading your workspace…</p>}
+          {user && ["voyages", "insights"].includes(view) && voyagePage.has_more && <button className="button secondary" disabled={loadingLists || Boolean(loadingMore)} onClick={() => loadMore("voyages")}>{loadingMore === "voyages" ? "Loading…" : "Load more voyages"}</button>}
+          {user && view === "fleet" && vesselPage.has_more && <button className="button secondary" disabled={loadingLists || Boolean(loadingMore)} onClick={() => loadMore("vessels")}>{loadingMore === "vessels" ? "Loading…" : "Load more vessels"}</button>}
           <footer><span>Bon Voyage</span><span>Maritime planning scenario · habitat coverage varies</span></footer>
         </div>
       </main>
@@ -1150,8 +1164,16 @@ export default function App() {
           setMode={setAuthMode}
           onClose={closeModal}
           onSuccess={(u) => {
-            setUser(u);
-            setModal(null);
+            const draft = expiredDraft.current; expiredDraft.current = null;
+            account.current = u.id; setUser(u); setModal(null);
+            if (draft?.owner === u.id) {
+              setEditingId(draft.editingId);
+              if (draft.vesselId) api(`/vessels/${draft.vesselId}`).then((ship) => {
+                if (account.current !== u.id) return;
+                setVessels((previous) => [...previous.filter((v) => v.id !== ship.id), ship]);
+                setVesselId(ship.id);
+              }).catch((e) => { if (e.status !== 404) notify(e.message); });
+            }
             notify("Welcome aboard, " + u.name + ".");
           }}
         />
@@ -1630,11 +1652,11 @@ function Profile({ user, setUser, notify, onLogout }) {
     </div>
   );
 }
-function Insights({ voyages, onPlan }) {
+function Insights({ voyages, stats, onPlan }) {
   const assessed = voyages.filter((voyage) => whaleAssessed(voyage.result, voyage.inputs));
-  const total = voyages.reduce((s, v) => s + v.inputs.weight, 0),
-    fuel = voyages.reduce((s, v) => s + v.result.fuel, 0),
-    protection = assessed.length
+  const total = stats?.cargo ?? voyages.reduce((s, v) => s + v.inputs.weight, 0),
+    fuel = stats?.fuel ?? voyages.reduce((s, v) => s + v.result.fuel, 0),
+    protection = stats ? stats.protection : assessed.length
       ? assessed.reduce((sum, voyage) => sum + voyage.result.protection, 0) / assessed.length
       : null;
   return (
@@ -1642,7 +1664,7 @@ function Insights({ voyages, onPlan }) {
       <section className="stats">
         <Stat
           label="Saved voyages"
-          value={voyages.length}
+          value={stats?.total ?? voyages.length}
           sub="Passages in your workspace"
           icon={Flag}
         />
@@ -1664,7 +1686,7 @@ function Insights({ voyages, onPlan }) {
           label="Whale assessment"
           value={protection === null ? "N/A" : Math.round(protection)}
           unit={protection === null ? "" : "/100"}
-          sub={`${assessed.length} of ${voyages.length} voyages have California scenario estimates`}
+          sub={`${stats?.assessed ?? assessed.length} of ${stats?.total ?? voyages.length} voyages have California scenario estimates`}
           dark
           icon={ShieldCheck}
         />
@@ -1680,7 +1702,7 @@ function Insights({ voyages, onPlan }) {
       ) : (
         <section className="panel insights-panel">
           <h2>Freshness across your passages</h2>
-          <p>Arrival freshness for every saved cargo shipment.</p>
+          <p>Arrival freshness for {voyages.length} loaded voyages of {stats?.total ?? voyages.length} saved shipments.</p>
           <div className="freshness-chart">
             {voyages.map((v) => (
               <div key={v.id}>

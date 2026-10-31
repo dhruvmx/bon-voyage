@@ -5,6 +5,7 @@ import { Layers, LocateFixed, Pause, Play } from "lucide-react";
 
 export default function VoyageMap({
   route,
+  highlightToken = 0,
   routes,
   zones,
   color,
@@ -18,7 +19,8 @@ export default function VoyageMap({
     map = useRef(null),
     overlays = useRef(null),
     ship = useRef(null),
-    initialBounds = useRef(null);
+    initialBounds = useRef(null),
+    routeLines = useRef([]);
 
   const [layers, setLayers] = useState({
     habitat: true,
@@ -174,6 +176,7 @@ export default function VoyageMap({
     if (!route) { overlays.current.clearLayers(); ship.current = null; return; }
     const group = overlays.current;
     group.clearLayers();
+    routeLines.current = [];
 
     // Helper to offset a [lat, lng] coordinate pair by a longitude
     const shiftPt = (pt, offset) => [pt[0], pt[1] + offset];
@@ -224,12 +227,13 @@ export default function VoyageMap({
         color: "var(--route-halo)",
         weight: 9,
       }).addTo(group);
-      L.polyline(shiftCoords(route.coordinates, offset), {
+      const line = L.polyline(shiftCoords(route.coordinates, offset), {
         color: "var(--route-color)",
         weight: 5,
       })
         .bindTooltip(`${route.name} · ${route.speed} kn open water`)
         .addTo(group);
+      routeLines.current.push(line);
 
       // Protected transit segments
       let chunk = [],
@@ -290,6 +294,20 @@ export default function VoyageMap({
   }, [route, routes, zones, color, layers]);
 
   useEffect(() => {
+    if (!highlightToken || !route || !map.current) return;
+    map.current.fitBounds(L.latLngBounds(route.coordinates).pad(0.15), { animate: false });
+    const elements = routeLines.current.map((line) => line.getElement()).filter(Boolean);
+    elements.forEach((element) => {
+      element.classList.remove("route-highlight");
+      void element.getBoundingClientRect();
+      element.classList.add("route-highlight");
+    });
+    const clear = () => elements.forEach((element) => element.classList.remove("route-highlight"));
+    const timer = setTimeout(clear, 2400);
+    return () => { clearTimeout(timer); clear(); };
+  }, [highlightToken, route]);
+
+  useEffect(() => {
     if (!ship.current || !route || !route.segments) return;
     const target = (route.hours * progress) / 100;
     let elapsed = 0;
@@ -346,7 +364,7 @@ export default function VoyageMap({
             ))}
           </div>
         )}
-        <span className="map-badge">
+        <span className="map-badge" role="status">
           ● {route?.name || "Calculating passage…"}
         </span>
         <button

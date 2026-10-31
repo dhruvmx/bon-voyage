@@ -34,10 +34,16 @@ The headline freshness remains a mass-weighted average. Fuel remains based on de
 
 Context for calibration: [UC Davis produce fact sheets](https://postharvest.ucdavis.edu/produce-facts), including [apples](https://postharvest.ucdavis.edu/produce-facts-sheets/apple-golden-delicious) and [strawberries](https://postharvest.ucdavis.edu/produce-facts-sheets/strawberry), explain commodity-dependent storage conditions. [FoodSafety.gov's cold-storage chart](https://www.foodsafety.gov/food-safety-charts/cold-food-storage-charts) distinguishes frozen quality horizons from safety. The application does not reproduce those references as validated shipment-specific data; packaging, cultivar, atmosphere, humidity, contamination, and temperature history remain outside this simple model.
 
-### Deadline and speed optimization (deadline-speed-v2)
+### Deadline and speed optimization (deadline-speed-v3)
 
 The arrival window is an upper bound on transit time. For every candidate path, the optimizer searches open-water cruise speeds at 0.01-knot resolution between the declared vessel minimum and maximum. The minimum applies to open water. Protected transit speed is searched separately from a modeled 5-knot minimum to the lower of 10 knots and the vessel maximum, in 0.1-knot steps including the exact cap. All protected segments in a candidate share that transit speed. No waiting is added to fill the window. Travel time, cubic fuel consumption, cargo quality, and assessed habitat exposure are evaluated together. Reference fuel is the shortest candidate distance at 18 knots and does not change with the deadline.
 
 Among feasible candidates, Recommended balance minimizes newly exhausted cargo tonnage, then the weighted objective. Fastest feasible arrival minimizes duration; Lowest fuel within deadline minimizes fuel and may consume more cargo quality budget, which the interface flags. Legacy mode IDs remain balanced/direct/eco respectively. Duplicate path/speed choices are explicitly labeled. If no candidate meets the deadline, the planner reports infeasibility and the earliest available estimate.
 
 Results include estimated arrival, deadline, slack, speed range, search counts, and optimizer version. Saved voyages and exports retain these values. The optimum is limited to supplied sea paths and this speed grid, with constant declared weather and no live port delays or currents. Tests compare the search against an independent dense calculation and check loose-deadline invariance, binding deadlines, infeasibility, vessel limits, and saved snapshots.
+
+### Habitat exposure (absolute-exposure-v1)
+
+California habitat exposure is `whale_distance_nm * (protected_speed / 10)^2 * activity`. Its bounded penalty is `exposure / (exposure + 50)`, and the displayed protection score is `100 * (1 - penalty)`. The fixed 50-nautical-mile reference is an explicit scenario normalization, not an empirically calibrated safety threshold. Adding open-water distance cannot dilute the same habitat exposure. International habitat scores remain unavailable. New optimizer snapshots record the habitat model and reference; historical saved scores are retained.
+
+Worldwide alternatives are deduplicated by ordered coordinates rounded to six decimal places, ignoring consecutive duplicate points. Similar path lengths alone do not imply identical geography.

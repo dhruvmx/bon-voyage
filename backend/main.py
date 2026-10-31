@@ -1,8 +1,8 @@
 import math, hashlib, hmac, json, os, re, secrets, sqlite3, time
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from fastapi import FastAPI, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, Request, Response, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -44,6 +44,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS attempts_key_idx ON login_attempts(key,at);
         CREATE INDEX IF NOT EXISTS vessels_user_idx ON vessels(user_id);
         CREATE INDEX IF NOT EXISTS voyages_user_idx ON voyages(user_id);
+        CREATE INDEX IF NOT EXISTS voyages_page_idx ON voyages(user_id,created_at DESC,id DESC);
+        CREATE INDEX IF NOT EXISTS vessels_page_idx ON vessels(user_id,created_at DESC,id DESC);
         ''')
 init_db()
 
@@ -182,7 +184,7 @@ class PlanInput(BaseModel):
     min_speed:float|None=Field(default=None,ge=5,le=35)
     fuel_per_day:float=Field(default=35,gt=0,le=500)
     whale_activity:float=Field(default=1,ge=.25,le=3)
-    departure:str
+    departure:str=Field(min_length=10,max_length=40)
     @model_validator(mode='after')
     def valid(self):
         if self.min_speed is None: self.min_speed=min(8,self.max_speed)
@@ -202,6 +204,9 @@ class PlanInput(BaseModel):
             self.shelf_life=first.shelf_life; self.cargo_age=first.cargo_age
         dt=datetime.fromisoformat(self.departure.replace('Z','+00:00'))
         if not dt.tzinfo: raise ValueError('Departure needs a timezone.')
+        try: utc=dt.astimezone(timezone.utc)
+        except (OverflowError,ValueError): raise ValueError('Departure must be between 1900 and 2100.')
+        if not 1900<=utc.year<=2100: raise ValueError('Departure must be between 1900 and 2100.')
         return self
 @app.get('/api/catalog')
 def catalog(): return {'ports':PORTS,'cargo_types':CARGOS,'cargo_products':PRODUCTS,'zones':ZONES,'data_coverage':DATA_COVERAGE,'max_cargo_items':10,'max_arrival_hours':2160}
@@ -243,15 +248,61 @@ class Voyage(BaseModel):
         if v not in ['Planned','In transit','Arrived']: raise ValueError('Invalid voyage status.')
         return v
 
-def list_records(table,user):
-    with db() as c: rows=c.execute(f'SELECT * FROM {table} WHERE user_id=? ORDER BY created_at DESC',(user['id'],)).fetchall()
-    return [{'id':r['id'],**json.loads(r['data']),'created_at':r['created_at']} for r in rows]
+def json_field(path):
+    # Paths are application constants, never request input. Extract only summary
+    # fields in SQL so list responses don't fetch large stored route geometries.
+    if database_url():
+        return "data::jsonb #>> '{"+path.replace('.',',')+"}'"
+    return "json_extract(data, '$."+path+"')"
+
+SUMMARY_FIELDS = {
+    'name':'name','status':'status','notes':'notes',
+    'origin':'inputs.origin','destination':'inputs.destination',
+    'cargo_name':'inputs.cargo_name','weight':'inputs.weight',
+    'distance':'result.distance','hours':'result.hours','freshness':'result.freshness',
+    'fuel':'result.fuel','protection':'result.protection','whale_assessed':'result.whale_assessed',
+}
+
+def voyage_summary(row):
+    assessed=row['whale_assessed']
+    if assessed is None:
+        assessed=row['protection'] is not None and row['origin'] in ('la','oakland','sandiego','humboldt') and row['destination'] in ('la','oakland','sandiego','humboldt')
+    else: assessed=str(assessed).lower() in ('true','1')
+    return {'id':row['id'],'name':row['name'],'status':row['status'],'notes':row['notes'] or '',
+            'created_at':row['created_at'],
+            'inputs':{key:float(row[key]) if key=='weight' else row[key] for key in ('origin','destination','cargo_name','weight')},
+            'result':{**{key:float(row[key]) if row[key] is not None else None for key in ('distance','hours','freshness','fuel','protection')},'whale_assessed':assessed}}
+
+def record_filter(table,user,q):
+    where='user_id=?'; params=[user['id']]
+    if q:
+        paths=['name','inputs.cargo_name','inputs.cargo_items'] if table=='voyages' else ['name','imo']
+        where+=' AND ('+' OR '.join("LOWER(COALESCE("+json_field(path)+",'')) LIKE ? ESCAPE '!'" for path in paths)+')'
+        pattern='%'+q.lower().replace('!','!!').replace('%','!%').replace('_','!_')+'%'
+        params.extend([pattern]*len(paths))
+    return where,params
+
+def list_records(table,user,limit,offset,q):
+    where,params=record_filter(table,user,q)
+    fields='id,data,created_at' if table=='vessels' else 'id,created_at,'+','.join(
+        ('substr('+json_field(path)+',1,200)' if key=='notes' else json_field(path))+' AS '+key for key,path in SUMMARY_FIELDS.items())
+    with db() as c:
+        total=c.execute(f'SELECT COUNT(*) AS total FROM {table} WHERE {where}',params).fetchone()['total']
+        rows=c.execute(f'SELECT {fields} FROM {table} WHERE {where} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?',[*params,limit,offset]).fetchall()
+    items=[{'id':r['id'],**json.loads(r['data']),'created_at':r['created_at']} for r in rows] if table=='vessels' else [voyage_summary(row) for row in rows]
+    return {'items':items,'total':total,'limit':limit,'offset':offset,'has_more':offset+len(items)<total}
+
 def owned_record(c,table,record_id,user):
     row=c.execute(f'SELECT * FROM {table} WHERE id=? AND user_id=?',(record_id,user['id'])).fetchone()
     if not row: raise HTTPException(404,'Record not found.')
     return row
 @app.get('/api/vessels')
-def vessels(user=Depends(current_user)): return list_records('vessels',user)
+def vessels(limit:int=Query(20,ge=1,le=100),offset:int=Query(0,ge=0,le=1000000000),q:str=Query('',max_length=100),user=Depends(current_user)):
+    return list_records('vessels',user,limit,offset,q.strip())
+@app.get('/api/vessels/{vid}')
+def vessel_detail(vid:str,user=Depends(current_user)):
+    with db() as c: row=owned_record(c,'vessels',vid,user)
+    return {'id':row['id'],**json.loads(row['data']),'created_at':row['created_at']}
 @app.post('/api/vessels',status_code=201)
 def add_vessel(p:Vessel,user=Depends(current_user)):
     vid=secrets.token_hex(12)
@@ -281,7 +332,26 @@ def voyage_data(p,user):
     if not chosen: raise HTTPException(422,'Choose a valid route.')
     return {**p.model_dump(),'result':chosen,'data_coverage':result['data_coverage'],'data_mode':result['data_mode'],'optimization':result['optimization'],'deadline_at':result['deadline_at']}
 @app.get('/api/voyages')
-def voyages(user=Depends(current_user)): return list_records('voyages',user)
+def voyages(limit:int=Query(20,ge=1,le=100),offset:int=Query(0,ge=0,le=1000000000),q:str=Query('',max_length=100),user=Depends(current_user)):
+    return list_records('voyages',user,limit,offset,q.strip())
+
+@app.get('/api/voyages/stats')
+def voyage_stats(user=Depends(current_user)):
+    weight='CAST('+json_field('inputs.weight')+' AS DOUBLE PRECISION)'
+    fuel='CAST('+json_field('result.fuel')+' AS DOUBLE PRECISION)'
+    protection='CAST('+json_field('result.protection')+' AS DOUBLE PRECISION)'
+    assessed="LOWER(CAST("+json_field('result.whale_assessed')+" AS TEXT)) IN ('true','1')"
+    ca="('la','oakland','sandiego','humboldt')"
+    assessed+=' OR ('+json_field('result.whale_assessed')+' IS NULL AND '+json_field('inputs.origin')+' IN '+ca+' AND '+json_field('inputs.destination')+' IN '+ca+')'
+    assessed='('+assessed+') AND '+protection+' IS NOT NULL'
+    with db() as c:
+        row=c.execute('SELECT COUNT(*) AS total, COALESCE(SUM('+weight+'),0) AS cargo, COALESCE(SUM('+fuel+'),0) AS fuel, COUNT(CASE WHEN '+assessed+' THEN 1 END) AS assessed, AVG(CASE WHEN '+assessed+' THEN '+protection+' END) AS protection FROM voyages WHERE user_id=?',(user['id'],)).fetchone()
+    return dict(row)
+
+@app.get('/api/voyages/{vid}')
+def voyage_detail(vid:str,user=Depends(current_user)):
+    with db() as c: row=owned_record(c,'voyages',vid,user)
+    return {'id':row['id'],**json.loads(row['data']),'created_at':row['created_at']}
 @app.post('/api/voyages',status_code=201)
 def add_voyage(p:Voyage,user=Depends(current_user)):
     data=voyage_data(p,user); vid=secrets.token_hex(12); now=time.time()

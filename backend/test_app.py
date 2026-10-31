@@ -5,6 +5,11 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from backend import main
 
+def full_records(client):
+    page=client.get('/api/voyages?limit=100').json()
+    return [client.get('/api/voyages/'+item['id']).json() for item in page['items']]
+
+
 class BonVoyageTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(dir=main.ROOT / "data"); self.old=main.DB
@@ -40,12 +45,12 @@ class BonVoyageTests(unittest.TestCase):
     def test_voyage_crud_and_account_isolation(self):
         self.signup(self.a);self.signup(self.b,'other@example.com')
         r=self.a.post('/api/voyages',json=self.voyage());self.assertEqual(r.status_code,201,r.text);vid=r.json()['id']
-        self.assertEqual(len(self.a.get('/api/voyages').json()),1);self.assertEqual(self.b.get('/api/voyages').json(),[])
+        self.assertEqual(len(full_records(self.a)),1);self.assertEqual(full_records(self.b),[])
         self.assertEqual(self.b.put('/api/voyages/'+vid,json=self.voyage()).status_code,404)
         self.assertEqual(self.b.delete('/api/voyages/'+vid).status_code,404)
         self.assertEqual(self.a.put('/api/voyages/'+vid,json=self.voyage(name='Updated voyage',status='In transit')).status_code,200)
-        self.assertEqual(self.a.get('/api/voyages').json()[0]['status'],'In transit')
-        self.assertEqual(self.a.delete('/api/voyages/'+vid).status_code,200);self.assertEqual(self.a.get('/api/voyages').json(),[])
+        self.assertEqual(full_records(self.a)[0]['status'],'In transit')
+        self.assertEqual(self.a.delete('/api/voyages/'+vid).status_code,200);self.assertEqual(full_records(self.a),[])
     def test_vessel_capacity_and_ownership(self):
         self.signup(self.a);self.signup(self.b,'other@example.com')
         vessel=self.a.post('/api/vessels',json={'name':'Pacific Voyager','max_speed':20,'capacity':100,'fuel_per_day':30}).json()
@@ -54,7 +59,7 @@ class BonVoyageTests(unittest.TestCase):
         self.inputs.update(weight=90,max_speed=20,fuel_per_day=30)
         self.assertEqual(self.a.post('/api/voyages',json=self.voyage(vessel_id=vid)).status_code,201)
         self.assertEqual(self.a.delete('/api/vessels/'+vid).status_code,200)
-        self.assertEqual(len(self.a.get('/api/voyages').json()),1)
+        self.assertEqual(len(full_records(self.a)),1)
     def test_routes_have_valid_geography_and_speed_caps(self):
         r=self.a.post('/api/plan',json=self.inputs);self.assertEqual(r.status_code,200,r.text)
         routes=r.json()['routes'];self.assertEqual(len(routes),3)
@@ -85,7 +90,7 @@ class BonVoyageTests(unittest.TestCase):
         self.signup(self.a);self.a.post('/api/voyages',json=self.voyage());self.a.post('/api/auth/logout')
         new=TestClient(main.app)
         self.assertEqual(new.post('/api/auth/login',json={'email':'alex@example.com','password':'test-password-123'}).status_code,200)
-        self.assertEqual(len(new.get('/api/voyages').json()),1);new.close()
+        self.assertEqual(len(full_records(new)),1);new.close()
 
     def test_catalog_products_and_global_coverage(self):
         catalog=self.a.get('/api/catalog').json()
@@ -160,7 +165,7 @@ class BonVoyageTests(unittest.TestCase):
         items[0]['weight']=30; items[1]['weight']=20
         saved=self.a.post('/api/voyages',json=payload)
         self.assertEqual(saved.status_code,201,saved.text)
-        record=self.a.get('/api/voyages').json()[0]
+        record=full_records(self.a)[0]
         self.assertEqual(record['inputs']['weight'],50)
         self.assertEqual(record['inputs']['cargo_items'][1]['name'],'Custom tools')
         self.assertEqual(len(record['result']['cargo_results']),2)
@@ -217,7 +222,9 @@ class BonVoyageTests(unittest.TestCase):
         payload={**self.inputs,'cargo_items':[{'product_id':'raspberries','weight':.1},{'product_id':'computers','weight':1000}]}
         result=self.a.post('/api/plan',json=payload).json()
         best=next(route for route in result['routes'] if route['id']==result['recommended'])
-        self.assertEqual(best['hours'],min(route['hours'] for route in result['routes']))
+        self.assertGreater(best['score_breakdown']['weights']['freshness'],.5)
+        self.assertEqual(best['newly_expired_tonnes'],0)
+        self.assertLess(best['hours'],next(route for route in result['routes'] if route['id']=='eco')['hours'])
         for route in result['routes']:
             self.assertGreaterEqual(route['score'],0); self.assertLessEqual(route['score'],1)
         payload.update(origin='shanghai',destination='singapore')
