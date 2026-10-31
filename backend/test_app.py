@@ -186,6 +186,59 @@ class BonVoyageTests(unittest.TestCase):
             self.assertGreater(calls,0); self.assertEqual(network.call_count,calls)
             self.assertEqual(first['routes'][0]['coordinates'],second['routes'][0]['coordinates'])
 
+    def test_every_product_has_a_bounded_perishability_model(self):
+        for product in self.a.get('/api/catalog').json()['cargo_products']:
+            model=product['model']; weights=model['routing_weights']
+            self.assertAlmostEqual(sum(weights.values()),1)
+            self.assertTrue(all(0<=value<=1 for value in weights.values()))
+            self.assertGreaterEqual(model['decay_percent_per_day'],0)
+            if not model['perishable']:
+                self.assertEqual(model['decay_percent_per_day'],0)
+                self.assertEqual(weights['freshness'],0)
+
+    def test_apples_berries_and_electronics_have_distinct_quality_loss(self):
+        from backend.cargo_model import evaluate_cargo
+        from backend.cargo_catalog import PRODUCT_BY_ID
+        from backend.main import CargoItem
+        quality={key:evaluate_cargo(CargoItem(product_id=key),PRODUCT_BY_ID[key]['model'],48)['freshness']
+                 for key in ['apples','raspberries','computers']}
+        self.assertLess(quality['raspberries'],quality['apples'])
+        self.assertLess(quality['apples'],quality['computers'])
+        self.assertEqual(quality['computers'],100)
+        new=self.a.post('/api/plan',json={**self.inputs,'cargo_items':[{'product_id':'apples'}]}).json()
+        old=self.a.post('/api/plan',json={**self.inputs,'cargo_items':[{'product_id':'apples','cargo_age':1410}]}).json()
+        self.assertEqual(new['recommended'],'eco'); self.assertEqual(old['recommended'],'direct')
+        self.assertGreater(old['routes'][0]['score_breakdown']['weights']['freshness'],new['routes'][0]['score_breakdown']['weights']['freshness'])
+
+    def test_small_perishable_load_and_normalized_global_weights(self):
+        payload={**self.inputs,'cargo_items':[{'product_id':'raspberries','weight':.1},{'product_id':'computers','weight':1000}]}
+        result=self.a.post('/api/plan',json=payload).json()
+        self.assertEqual(result['recommended'],'direct')
+        for route in result['routes']:
+            self.assertGreaterEqual(route['score'],0); self.assertLessEqual(route['score'],1)
+        payload.update(origin='shanghai',destination='singapore')
+        global_route=self.a.post('/api/plan',json=payload).json()['routes'][0]
+        weights=global_route['score_breakdown']['weights']
+        self.assertEqual(weights['habitat'],0); self.assertAlmostEqual(sum(weights.values()),1)
+        self.assertIsNone(global_route['score_breakdown']['components']['habitat'])
+
+    def test_frozen_thawing_cold_floor_and_priority_override(self):
+        from backend.cargo_model import evaluate_cargo
+        from backend.cargo_catalog import PRODUCT_BY_ID
+        from backend.main import CargoItem
+        model=PRODUCT_BY_ID['frozen-beef']['model']
+        frozen=evaluate_cargo(CargoItem(product_id='frozen-beef'),model,48)
+        colder=evaluate_cargo(CargoItem(product_id='frozen-beef',temperature=-30),model,48)
+        thawed=evaluate_cargo(CargoItem(product_id='frozen-beef',temperature=4),model,100)
+        self.assertEqual(colder['freshness'],frozen['freshness'])
+        self.assertEqual(thawed['freshness'],0)
+        self.assertTrue(thawed['expired_on_arrival'])
+        payload={**self.inputs,'cargo_items':[{'name':'Custom fruit','profile':'avocados','shelf_life':100,'routing_priority':'freshness'}]}
+        response=self.a.post('/api/plan',json=payload).json()
+        self.assertAlmostEqual(response['routes'][0]['cargo_results'][0]['model']['routing_weights']['freshness'],.85)
+        payload['cargo_items'][0]['routing_priority']='unknown'
+        self.assertEqual(self.a.post('/api/plan',json=payload).status_code,422)
+
 if __name__=='__main__':unittest.main()
 
 

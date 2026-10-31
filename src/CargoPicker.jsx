@@ -2,7 +2,7 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import { MAX_CARGO_ITEMS, profileNames } from "./cargo";
 
-export default memo(function CargoPicker({ products, profiles, items, onChange }) {
+export default memo(function CargoPicker({ products, profiles, items, onChange, results: cargoResults, calculating }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -32,7 +32,7 @@ export default memo(function CargoPicker({ products, profiles, items, onChange }
   function add(product) {
     if (full || added(product)) return;
     onChange([...items, { product_id: product.id, name: product.name, profile: product.profile,
-      weight: 10, temperature: product.temperature, shelf_life: product.shelf_life, cargo_age: 0 }]);
+      weight: 10, temperature: product.temperature, shelf_life: product.shelf_life, cargo_age: 0, routing_priority: "auto" }]);
     setNotice(`${product.name} added.`); setQuery(""); setActive(0);
     if (items.length + 1 === MAX_CARGO_ITEMS) setOpen(false);
     else input.current?.focus();
@@ -99,12 +99,15 @@ export default memo(function CargoPicker({ products, profiles, items, onChange }
         onClick={() => {
           const profile = profiles[custom.profile];
           onChange([...items, { product_id: null, name: custom.name.trim(), profile: custom.profile, weight: 10,
-            temperature: profile.temperature, shelf_life: profile.shelf, cargo_age: 0 }]);
+            temperature: profile.temperature, shelf_life: profile.shelf, cargo_age: 0, routing_priority: "auto" }]);
           setNotice(`${custom.name.trim()} added.`); setCustom(null); setQuery(""); setOpen(false);
         }}>Add cargo</button><button type="button" className="text-button" onClick={() => setCustom(null)}>Cancel</button></div>
     </fieldset>}
     <div className="manifest-items">
-      {items.map((item, index) => <article className="manifest-item" key={item.product_id || `custom-${item.name}`}>
+      {items.map((item, index) => {
+        const assessment = !calculating && cargoResults?.find((result) => item.product_id ? result.product_id === item.product_id : result.name === item.name);
+        const model = assessment?.model;
+        return <article className="manifest-item" key={item.product_id || `custom-${item.name}`}>
         <details><summary><span><b>{item.name}</b><small>{item.weight || 0} t · {profileNames[item.profile]}</small></span><ChevronDown size={15} aria-hidden="true" /></summary>
           <div className="manifest-fields">
             <label className="field"><span>Weight (tonnes)</span><input aria-label={`${item.name} weight (tonnes)`} type="number" min="0.001" max="100000" step="any" value={item.weight}
@@ -112,7 +115,7 @@ export default memo(function CargoPicker({ products, profiles, items, onChange }
             {!item.product_id && <label className="field"><span>Perishability</span><select aria-label={`${item.name} perishability`} value={item.profile} onChange={(event) => {
               const profile = event.target.value;
               onChange(items.map((cargo, i) => i === index ? { ...cargo, profile,
-                temperature: profiles[profile].temperature, shelf_life: profiles[profile].shelf } : cargo));
+                temperature: profiles[profile].temperature, shelf_life: profiles[profile].shelf, routing_priority: "auto" } : cargo));
             }}>{Object.entries(profileNames).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label>}
             {item.profile !== "electronics" && <>
               <label className="field"><span>Temperature (°C)</span><input aria-label={`${item.name} temperature (°C)`} type="number" min="-30" max="40" step="any" value={item.temperature}
@@ -123,11 +126,27 @@ export default memo(function CargoPicker({ products, profiles, items, onChange }
                 onChange={(event) => update(index, "cargo_age", numberInput(event.target.value, 24))} /></label>
             </>}
           </div>
+          <div className="cargo-model">
+            <label className="field"><span>Routing preference</span><select aria-label={`${item.name} routing preference`}
+              value={item.routing_priority || "auto"} onChange={(event) => update(index, "routing_priority", event.target.value)}>
+              <option value="auto">Automatic · remaining shelf life</option>
+              {item.profile !== "electronics" && <option value="freshness">Freshness first</option>}
+              <option value="fuel">Fuel first</option><option value="habitat">Habitat first</option>
+            </select></label>
+            {model ? <>
+              <strong>{model.perishable ? `${model.decay_percent_per_day.toFixed(2)}% quality budget per day` : "0% spoilage loss · non-perishable"}</strong>
+              {model.perishable && <small>At {model.reference_temperature}°C; warmer cargo uses the budget faster. Below-reference cooling does not extend it.</small>}
+              <small>Cargo priorities: {Math.round(model.routing_weights.freshness * 100)}% freshness · {Math.round(model.routing_weights.fuel * 100)}% fuel · {Math.round(model.routing_weights.habitat * 100)}% habitat.</small>
+              {assessment.expired_at_departure && <small className="cargo-at-risk">Quality budget already exhausted at departure.</small>}
+              {model.frozen && <small>Above {model.thaw_temperature}°C, the model caps the thawed quality horizon at {model.thawed_quality_hours} hours.</small>}
+            </> : <small>Model values update after valid cargo inputs are calculated.</small>}
+          </div>
         </details>
         <button type="button" className="manifest-remove" aria-label={`Remove ${item.name}`} onClick={() => {
           onChange(items.filter((_, i) => i !== index)); setNotice(`${item.name} removed.`);
         }}><X size={15} /></button>
-      </article>)}
+      </article>;
+      })}
     </div>
     <div className="manifest-total"><span>Total cargo</span><strong>{items.reduce((total, item) => total + (Number(item.weight) || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 3 })} t</strong></div>
     <small className="cargo-hint">Handling values are editable scenario assumptions. Temperatures assume separate cargo compartments.</small>

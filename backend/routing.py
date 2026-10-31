@@ -8,6 +8,7 @@ from functools import lru_cache
 from threading import Lock
 from types import SimpleNamespace
 from .cargo_catalog import PRODUCT_BY_ID
+from .cargo_model import MODEL_VERSION, evaluate_cargo, product_model, score_route
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -57,7 +58,14 @@ CARGOS = {
     "avocados":{"name":"Avocados / bananas","level":"Managed atmosphere","temperature":5,"shelf":336,"decay":.075,"weights":[.30,.35,.35],"color":"#617348"},
     "grain":{"name":"Bulk grain","level":"Bulk commodity","temperature":18,"shelf":6000,"decay":.001,"weights":[.02,.43,.55],"color":"#a3832e"},
     "electronics":{"name":"Electronics","level":"Non-perishable","temperature":18,"shelf":99999,"decay":0,"weights":[0,.4,.6],"color":"#72758a"},
+    "frozen":{"name":"Frozen goods","level":"Frozen quality model","temperature":-18,"shelf":4320,"color":"#64899c"},
 }
+
+# Legacy profile fields remain available, now derived from the same model as products.
+for profile_id,profile in CARGOS.items():
+    profile['model']=product_model(profile_id!='electronics',profile['shelf'],profile['temperature'],profile_id=='frozen')
+    profile['decay']=profile['model']['decay_percent_per_day']/24
+    profile['weights']=list(profile['model']['routing_weights'].values())
 
 # (route id, display name, cruise speed in knots)
 PASSAGES = [("direct","Freshness first",18.5),("balanced","Balanced passage",16),("eco","Ocean first",13.5)]
@@ -162,16 +170,9 @@ def cargo_outcomes(p,hours):
         temperature=p.temperature,shelf_life=p.shelf_life,cargo_age=p.cargo_age)]
     outcomes=[]
     for item in items:
-        model=CARGOS[item.profile]
         product=PRODUCT_BY_ID.get(item.product_id,{})
-        reference_temperature=product.get('temperature',model['temperature'])
-        thermal=2**((item.temperature-reference_temperature)/10)
-        remaining=max(0,item.shelf_life/thermal-item.cargo_age-hours)
-        freshness=100 if model['decay']==0 else max(0,min(100,
-            100-(item.cargo_age+hours)*model['decay']*thermal,
-            100*remaining/max(1,item.shelf_life/thermal)))
-        outcomes.append(dict(product_id=item.product_id,name=item.name,profile=item.profile,
-            weight=item.weight,freshness=round(freshness,2),shelf_remaining=round(remaining,1)))
+        model=product.get('model',CARGOS[item.profile]['model'])
+        outcomes.append(evaluate_cargo(item,model,hours))
     return outcomes
 
 def plan(p):
@@ -192,7 +193,7 @@ def plan(p):
         outcomes=cargo_outcomes(p,hours)
         total_weight=sum(item['weight'] for item in outcomes)
         freshness=sum(item['freshness']*item['weight'] for item in outcomes)/total_weight
-        remaining=min(item['shelf_remaining'] for item in outcomes)
+        remaining=min((item['shelf_remaining'] for item in outcomes if item['perishable']),default=None)
         # Vessel fuel/day is the reference at 18 knots; power follows speed cubed.
         fuel=0; exposure=0
         for s in segments:
@@ -202,18 +203,17 @@ def plan(p):
         protection=max(0,100-exposure/max(1,total)*100*p.whale_activity)
         eta=(datetime.fromisoformat(p.departure.replace('Z','+00:00'))+timedelta(hours=hours)).astimezone(timezone.utc).isoformat()
         feasible=hours<=p.arrival_window+.001
-        # Keep the most time-sensitive item visible even in a mostly dry manifest.
-        urgency=max(CARGOS[item['profile']]['weights'][0]*((100-item['freshness'])+max(0,hours-p.arrival_window)*3) for item in outcomes)
-        fuel_weight=sum(CARGOS[item['profile']]['weights'][1]*item['weight'] for item in outcomes)/total_weight
-        habitat_weight=sum(CARGOS[item['profile']]['weights'][2]*item['weight'] for item in outcomes)/total_weight
-        score=urgency+fuel_weight*(fuel/20)+(habitat_weight*(100-protection)/10 if california else 0)
-        rows.append(dict(id=route_id,name=name,distance=round(total,1),protected_distance=round(protected,1),open_distance=round(open_nm,1),speed=round(speed,2),hours=round(hours,2),freshness=round(freshness,2),fuel=round(fuel,2),co2=round(fuel*3.114,2),protection=round(protection,1) if california else None,whale_assessed=california,cargo_results=outcomes,worst_cargo_freshness=min(item['freshness'] for item in outcomes),eta=eta,feasible=feasible,shelf_remaining=round(remaining,1),score=score,coordinates=coords,segments=segments))
+
+        rows.append(dict(id=route_id,name=name,distance=round(total,1),protected_distance=round(protected,1),open_distance=round(open_nm,1),speed=round(speed,2),hours=round(hours,2),freshness=round(freshness,2),fuel=round(fuel,2),co2=round(fuel*3.114,2),protection=round(protection,1) if california else None,whale_assessed=california,cargo_results=outcomes,worst_cargo_freshness=min(item['freshness'] for item in outcomes),eta=eta,feasible=feasible,shelf_remaining=round(remaining,1) if remaining is not None else None,coordinates=coords,segments=segments))
     baseline=rows[0]['distance']/18*p.fuel_per_day/24
-    for r in rows: r['fuel_delta']=round((r['fuel']/max(.01,baseline)-1)*100,1)
-    best=min(rows,key=lambda r:(not r['feasible'],r['score']))
+    for r in rows:
+        r['fuel_delta']=round((r['fuel']/max(.01,baseline)-1)*100,1)
+        r['score'],r['newly_expired_tonnes'],r['score_breakdown']=score_route(r,baseline,california)
+        r['cargo_model_version']=MODEL_VERSION
+    best=min(rows,key=lambda r:(not r['feasible'],r['newly_expired_tonnes'],r['score']))
     mode='California coastal planning scenario' if california else 'Global sea-lane planning (searoute network)'
     coverage={**DATA_COVERAGE,'whale':{**DATA_COVERAGE['whale'],'score_available':california,
         'status':'scenario' if california else 'unassessed',
         'summary':'California scenario estimate; not a live safety or compliance assessment.' if california else 'Whale habitat coverage is incomplete for this passage. No global safety score is available.'}}
     distinct=len({tuple(map(tuple,coords)) for coords in paths.values()})
-    return {'routes':rows,'recommended':best['id'],'zones':ZONES,'data_mode':mode,'data_coverage':coverage,'distinct_paths':distinct}
+    return {'routes':rows,'recommended':best['id'],'zones':ZONES,'data_mode':mode,'data_coverage':coverage,'distinct_paths':distinct,'cargo_model_version':MODEL_VERSION}

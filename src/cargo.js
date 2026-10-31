@@ -2,6 +2,7 @@ export const MAX_CARGO_ITEMS = 10;
 export const profileNames = {
   berries: "Highly perishable", avocados: "Perishable produce",
   grain: "Long shelf life", electronics: "Non-perishable",
+  frozen: "Frozen goods",
 };
 
 export function cargoItems(inputs) {

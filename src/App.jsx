@@ -37,10 +37,10 @@ const freshInputs = () => ({
   destination: "oakland",
   cargo_type: "avocados",
   cargo_name: "Avocados",
-  cargo_items: [{ product_id: "avocados", name: "Avocados", profile: "avocados", weight: 240, temperature: 5, shelf_life: 336, cargo_age: 0 }],
+  cargo_items: [{ product_id: "avocados", name: "Avocados", profile: "avocados", weight: 240, temperature: 5, shelf_life: 504, cargo_age: 0, routing_priority: "auto" }],
   weight: 240,
   temperature: 5,
-  shelf_life: 336,
+  shelf_life: 504,
   cargo_age: 0,
   arrival_window: 36,
   max_speed: 24,
@@ -653,7 +653,7 @@ export default function App() {
                       </Field>
                     </div>
                     <CargoPicker products={catalog.cargo_products || []} profiles={catalog.cargo_types}
-                      items={manifest} onChange={setManifest} />
+                      items={manifest} onChange={setManifest} results={route?.cargo_results} calculating={calculating} />
                     <label className="range-label" htmlFor="arrival-window">
                       Arrival window{" "}
                       <strong>{formatHours(inputs.arrival_window)}</strong>
@@ -801,9 +801,14 @@ export default function App() {
               </div>
               {route?.cargo_results && <section className="panel cargo-arrival">
                 <div className="panel-heading"><div><h2>Cargo on arrival</h2><p>Item-level estimates for the selected passage. The headline freshness is weighted by cargo mass.</p></div></div>
+                {route.score_breakdown && <div className="route-priorities">
+                  <strong>Applied route priorities</strong>
+                  <span>{Math.round(route.score_breakdown.weights.freshness * 100)}% freshness · {Math.round(route.score_breakdown.weights.fuel * 100)}% fuel · {route.score_breakdown.components.habitat === null ? "Habitat unassessed" : `${Math.round(route.score_breakdown.weights.habitat * 100)}% habitat`}</span>
+                  <small>Arrival feasibility and avoiding newly exhausted cargo budgets come first. Then these weights rank quality loss, fuel use, and available habitat data.</small>
+                </div>}
                 <div className="cargo-table-wrap"><table><caption className="sr-only">Cargo freshness and remaining shelf life</caption>
                   <thead><tr><th scope="col">Cargo</th><th scope="col">Weight</th><th scope="col">Freshness</th><th scope="col">Shelf life left</th></tr></thead>
-                  <tbody>{route.cargo_results.map((item, index) => <tr key={index}><th scope="row">{item.name}</th><td>{item.weight.toLocaleString()} t</td><td className={item.freshness < 70 ? "cargo-at-risk" : ""}>{item.freshness.toFixed(1)}%</td><td>{item.profile === "electronics" ? "Non-perishable" : formatHours(Math.floor(item.shelf_remaining))}</td></tr>)}</tbody>
+                  <tbody>{route.cargo_results.map((item, index) => <tr key={index}><th scope="row">{item.name}</th><td>{item.weight.toLocaleString()} t</td><td className={item.freshness < 70 ? "cargo-at-risk" : ""}>{item.freshness.toFixed(1)}%</td><td>{item.perishable === false || item.profile === "electronics" ? "Non-perishable" : formatHours(Math.floor(item.shelf_remaining))}</td></tr>)}</tbody>
                 </table></div>
               </section>}
               <section className="routes-section">
@@ -870,7 +875,7 @@ export default function App() {
                   <div className="speed-segments">
                     <div><strong>{Math.min(10, inputs.max_speed)} kn</strong><small>Modeled slow zones only</small></div>
                     <div><strong>{route.speed.toFixed(1)} kn</strong><small>Open-water speed</small></div>
-                    <div><strong>{route.shelf_remaining.toFixed(0)} h</strong><small>Shelf life on arrival</small></div>
+                    <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Earliest quality horizon on arrival"}</small></div>
                   </div>
                 </section>
               )}
