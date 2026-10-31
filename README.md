@@ -34,6 +34,3 @@ The California routes and habitat overlays are scenario inputs. Calculations run
 npm run check
 ```
 
-## Hosted prototype
-
-https://tideway-maritime-food-routes.softray2048.chatgpt.site
