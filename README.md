@@ -1,6 +1,10 @@
 # Bon Voyage
 
-React + Vite frontend, Python FastAPI backend, Neon PostgreSQL for Vercel, and SQLite for local installs. A complete local maritime food logistics prototype with account-based workspaces and a minimal, consistent dashboard.
+Live app: https://bon-voyage-eight.vercel.app
+
+Source: https://github.com/dhruvmx/bon-voyage
+
+React + Vite frontend, Python FastAPI backend, Neon PostgreSQL for Vercel, and SQLite for local installs. A maritime food logistics prototype with account-based workspaces and a minimal, consistent dashboard.
 
 ## Start
 
@@ -49,7 +53,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
 - Responsive layout with mobile navigation.
 
-The map and coastline data are bundled and work offline. The California route and habitat datasets are included planning scenarios; API accounts or live AIS/whale feeds are not required. Planning and saved records work locally.
+The map and coastline data are bundled and work offline. The California route and habitat datasets are included planning scenarios; API accounts or live AIS/whale feeds are not required. Planning and saved records work locally and on the public Vercel deployment.
 
 ## Tests
 
@@ -84,7 +88,7 @@ Interactive API documentation: http://localhost:8000/docs
 
 ## Styling
 
-Edit the variables at the top of src/style.css to change colors, typography, spacing, or corner radius throughout the app. Shared surface, button, field, and layout rules apply across all pages. The stylesheet has 249 lines and two responsive breakpoints; no CSS framework or generated utility classes are required. Secondary vessel and cargo inputs remain under the expandable details section.
+Edit the variables at the top of src/style.css to change colors, typography, spacing, or corner radius throughout the app. Shared surface, button, field, and layout rules apply across all pages. The stylesheet uses shared layout rules and centralized ocean-theme tokens and two responsive breakpoints; no CSS framework or generated utility classes are required. Secondary vessel and cargo inputs remain under the expandable details section.
 
 
 
