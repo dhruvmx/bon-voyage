@@ -48,31 +48,62 @@ class OptimizerTests(unittest.TestCase):
         self.assertLessEqual(cheapest['fuel'],fastest['fuel'])
         berries=calculate(PlanInput(departure='2026-11-01T00:00:00Z',arrival_window=168,
                                    cargo_items=[{'product_id':'raspberries'}]))
-        self.assertEqual(self.chosen(berries,'direct')['same_as'],'balanced')
+        self.assertLessEqual(self.chosen(berries,'direct')['hours'],self.chosen(berries)['hours'])
 
     def test_full_speed_search_matches_independent_dense_scan(self):
         p=PlanInput(departure='2026-11-01T00:00:00Z',arrival_window=36,min_speed=8,max_speed=15,
                     cargo_items=[{'product_id':'raspberries','weight':1},{'product_id':'computers','weight':500}])
-        ports={port['id']:port for port in PORTS}
-        paths=prepare_paths(california_paths(ports['la'],ports['oakland']),True)
+        # A small speed interval still spans a full protected-speed grid and
+        # mixed zone/open-water segments, so direct segment sums stay cheap.
+        p.min_speed=14.9; p.max_speed=15.1
+        paths=[{'id':str(i),'distance':open_nm+protected_nm,'open_distance':open_nm,
+                'protected_distance':protected_nm,'whale_distance':protected_nm,
+                'segments':[{'zone':None,'distance':open_nm},{'zone':'Habitat','distance':protected_nm}]}
+               for i,(open_nm,protected_nm) in enumerate([(250,100),(300,60)])]
         choices,metadata=search_passages(paths,p,cargo_outcomes(p,0),True)
         ref=min(path['distance'] for path in paths)/18*p.fuel_per_day/24
         oracle=[]
         for path in paths:
-            for tick in range(800,1501):
-                speed=tick/100; zone_speed=10
-                hours=path['open_distance']/speed+path['protected_distance']/zone_speed
-                if hours>36: continue
-                # Compute consumption directly from segment time * cubic speed.
-                fuel=sum(p.fuel_per_day/24*((zone_speed if seg['zone'] else speed)/18)**3
-                         *seg['distance']/(zone_speed if seg['zone'] else speed) for seg in path['segments'])
-                protection=max(0,100-path['whale_distance']/path['distance']*100*p.whale_activity)
-                score,expired,_=score_route({'hours':hours,'fuel':fuel,'protection':protection,
-                                            'cargo_results':cargo_outcomes(p,hours)},ref,True)
-                oracle.append((expired,score,hours,fuel,path['id'],speed))
+            for zone_tick in range(50,101):
+                zone_speed=zone_tick/10
+                for tick in range(1490,1511):
+                    speed=tick/100
+                    hours=sum(seg['distance']/(zone_speed if seg['zone'] else speed) for seg in path['segments'])
+                    if hours>36: continue
+                    fuel=sum(p.fuel_per_day/24*((zone_speed if seg['zone'] else speed)/18)**3
+                             *seg['distance']/(zone_speed if seg['zone'] else speed) for seg in path['segments'])
+                    protection=max(0,100-path['whale_distance']*(zone_speed/10)**2/path['distance']*100*p.whale_activity)
+                    score,expired,_=score_route({'hours':hours,'fuel':fuel,'protection':protection,
+                                                'cargo_results':cargo_outcomes(p,hours)},ref,True)
+                    oracle.append((expired,score,hours,fuel,path['id'],speed,zone_speed))
         expected=min(oracle)
-        self.assertEqual((choices['balanced']['path']['id'],choices['balanced']['speed']),expected[-2:])
-        self.assertEqual(metadata['evaluated_combinations'],len(paths)*701)
+        choice=choices['balanced']
+        self.assertEqual((choice['path']['id'],choice['speed'],choice['zone_speed']),expected[-3:])
+        self.assertEqual(metadata['evaluated_combinations'],len(paths)*21*51)
+
+    def test_lowest_fuel_optimizes_protected_speeds_below_cap(self):
+        result=calculate(PlanInput(departure='2026-11-01T00:00:00Z',arrival_window=168,
+                                  cargo_items=[{'product_id':'computers','weight':10}]))
+        route=self.chosen(result,'eco')
+        self.assertEqual(route['protected_speed'],5)
+        self.assertLess(route['fuel'],6.5642)
+        self.assertLess(route['hours'],168)
+        self.assertTrue(all(seg['speed']==5 for seg in route['segments'] if seg['zone']))
+        fastest=self.chosen(result,'direct')
+        self.assertEqual(fastest['protected_speed'],10)
+        for option in result['routes']:
+            if option['same_as']:
+                prior=self.chosen(result,option['same_as'])
+                self.assertEqual((option['path_id'],option['speed'],option['protected_speed']),
+                                 (prior['path_id'],prior['speed'],prior['protected_speed']))
+
+    def test_protected_cap_and_no_zone_search(self):
+        result=self.plan(arrival_window=168,min_speed=5,max_speed=5.03)
+        self.assertTrue(all(route['protected_speed']<=5.03 for route in result['routes']))
+        path={'id':'open','distance':100,'open_distance':100,'protected_distance':0,'whale_distance':0}
+        p=PlanInput(departure='2026-11-01T00:00:00Z',min_speed=8,max_speed=9)
+        _,metadata=search_passages([path],p,cargo_outcomes(p,0),False)
+        self.assertEqual(metadata['evaluated_combinations'],101)
 
     def test_eta_slack_fuel_and_speed_instructions_are_consistent(self):
         result=self.plan(arrival_window=168,min_speed=12.37,max_speed=21.29)
@@ -120,8 +151,20 @@ class OptimizerTests(unittest.TestCase):
                     self.assertEqual(response.status_code,201,response.text)
                     saved=client.get('/api/voyages').json()[0]
                     self.assertEqual(saved['inputs']['min_speed'],12)
-                    self.assertEqual(saved['optimization']['version'],'deadline-speed-v1')
+                    self.assertEqual(saved['optimization']['version'],'deadline-speed-v2')
                     self.assertIn('deadline_at',saved)
                     self.assertGreater(saved['result']['slack_hours'],0)
+                    inputs['fuel_per_day']=1
+                    self.assertEqual(client.post('/api/voyages',json=body).status_code,422)
+                    self.assertEqual(client.put('/api/voyages/'+saved['id'],json=body).status_code,422)
+                    inputs['fuel_per_day']=35
+                    vessel['fuel_per_day']=100
+                    self.assertEqual(client.put('/api/vessels/'+vessel['id'],json=vessel).status_code,200)
+                    self.assertEqual(client.put('/api/voyages/'+saved['id'],json=body).status_code,422)
+                    inputs['fuel_per_day']=100
+                    updated=client.put('/api/voyages/'+saved['id'],json=body)
+                    self.assertEqual(updated.status_code,200,updated.text)
+                    self.assertEqual(updated.json()['inputs']['fuel_per_day'],100)
+
             finally:
                 main.DB=original

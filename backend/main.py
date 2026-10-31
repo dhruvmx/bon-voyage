@@ -1,4 +1,4 @@
-import hashlib, hmac, json, os, re, secrets, sqlite3, time
+import math, hashlib, hmac, json, os, re, secrets, sqlite3, time
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -275,6 +275,7 @@ def voyage_data(p,user):
         if p.inputs.weight>vessel['capacity']: raise HTTPException(422,'Cargo weight exceeds vessel capacity.')
         if p.inputs.max_speed>vessel['max_speed']: raise HTTPException(422,'Planning speed exceeds vessel maximum speed.')
         if p.inputs.min_speed<(vessel.get('min_speed') or min(8,vessel['max_speed'])): raise HTTPException(422,'Planning speed is below the vessel minimum open-water speed.')
+        if not math.isclose(p.inputs.fuel_per_day,vessel['fuel_per_day'],rel_tol=1e-9): raise HTTPException(422,'Planning fuel consumption must match the assigned vessel. Reapply the vessel specifications.')
     result=safe_plan(p.inputs)
     chosen=next((r for r in result['routes'] if r['id']==p.route_id),None)
     if not chosen: raise HTTPException(422,'Choose a valid route.')
