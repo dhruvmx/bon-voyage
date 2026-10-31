@@ -1,6 +1,6 @@
 # Tideway
 
-A maritime food logistics prototype that balances cargo freshness, fuel consumption, and whale protection along the California coast.
+A maritime food logistics prototype that balances cargo freshness, fuel consumption, and whale protection.
 
 ## Run locally
 
@@ -10,7 +10,7 @@ Requires Node.js 18 or newer. No dependencies or build step.
 npm start
 ```
 
-Open http://localhost:4173. You can also open `index.html` directly.
+Open http://localhost:4173
 
 ## Features
 
@@ -24,7 +24,10 @@ Open http://localhost:4173. You can also open `index.html` directly.
 
 ## Project structure
 
-`index.html` contains the dashboard and SVG map. `style.css` contains responsive styling. `app.js` contains the scenario model, routing, and interactions. `server.cjs` serves the prototype locally.
+- `index.html` contains the dashboard and SVG map. 
+- `style.css` contains responsive styling. 
+- `app.js` contains the scenario model, routing, and interactions.
+- `server.cjs` serves the prototype locally.
 
 The California routes and habitat overlays are scenario inputs. Calculations run in the browser. Saved voyages use localStorage.
 
