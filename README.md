@@ -53,6 +53,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Each of the 255 products has numeric perishability metadata. Individual food/flower horizons, temperature response, frozen/thawed quality caps, and remaining life drive automatic freshness/fuel/habitat priorities. Durable goods have zero modeled spoilage. Expand an item to inspect its model or override routing preference; selected-route priorities and score breakdowns explain the recommendation. See `backend/DATA.md` for equations and assumptions.
 - Arrival windows range from 1 to 2,160 hours (90 days), with a slider and precise numeric entry.
 - Protected segment speeds at or below 10 knots, vessel maximum-speed limits, arrival feasibility, temperature-dependent freshness, shelf-life decay, cubic fuel calculation, CO₂ estimates, and whale exposure scores.
+- Route comparison sits immediately beneath the map, beside the planning form on desktop. Cards show sailing time, fuel burned, lowest cargo quality, and deadline slack, with fuel differences explicitly compared to the recommendation. Selecting an option scrolls to its map and briefly emphasizes its path; reduced-motion preferences receive static emphasis.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
 - Responsive layout with mobile navigation.
@@ -64,7 +65,7 @@ The map, sea-lane network, and coastline data are bundled and work offline after
 ## Tests
 
 ```sh
-python -m unittest backend.test_app -v
+python -m unittest discover -s backend -p "test_*.py" -v
 npm run build
 ```
 
@@ -83,13 +84,18 @@ Interactive API documentation: http://localhost:8000/docs
 | `POST /api/auth/signup`, `/login`, `/logout` | Account sessions |
 | `GET /api/auth/me` | Current account |
 | `PUT /api/profile`, `/api/auth/password` | Profile and password updates |
-| `GET/POST /api/vessels`, `PUT/DELETE /api/vessels/{id}` | Private fleet management |
-| `GET/POST /api/voyages`, `PUT/DELETE /api/voyages/{id}` | Private voyage management |
+| `GET/POST /api/vessels`, `GET/PUT/DELETE /api/vessels/{id}` | Private fleet management |
+| `GET/POST /api/voyages`, `GET/PUT/DELETE /api/voyages/{id}` | Private voyage management |
+| `GET /api/voyages/stats` | Account-wide impact totals independent of pagination |
 | `GET /api/health` | Backend/database health |
 
 `GET /api/catalog` includes `cargo_products`, `max_cargo_items`, `max_arrival_hours`, and `data_coverage`. Send an optional `cargo_items` array to `/api/plan` or voyage endpoints. Each item has a catalogue `product_id` (or `null` and a custom `name`), `weight` in tonnes, and optional `profile`, `temperature`, `shelf_life` and `cargo_age` in hours. Catalogue identity/profile is resolved server-side. The server rejects more than 10 items, duplicate names, invalid handling values, and total cargo over 100,000 tonnes. Legacy single-cargo requests remain valid.
 
 Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. The optimizer searches every candidate path at 0.01-knot open-water speed intervals within vessel limits. Protected transit speed is also optimized from 5 knots to the applicable cap (at most 10 knots), at 0.1-knot resolution. The arrival window is a maximum, with no waiting added. Results expose ETA, deadline slack, search metadata, and explicit infeasibility when even the fastest candidate is late. Identical path/speed options are labeled; `distinct_paths` reports the actual geometric count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
+
+List endpoints return `{ items, total, limit, offset, has_more }`, with 20 items by default (maximum 100). Both accept `limit`, `offset` and `q`; voyage search covers the voyage name and cargo manifest. Voyage list items contain small card summaries, without coordinates, segments or full manifests. Fetch `GET /api/voyages/{id}` to edit or export the complete saved snapshot; `GET /api/vessels/{id}` resolves off-page vessel assignments. Fleet and voyage screens load additional pages on demand, while `/api/voyages/stats` supplies totals across the whole account. Session expiry prompts login, preserves the current draft, and restores its record/vessel association when the same account signs back in.
+
+Departure timestamps require a timezone and a UTC year between 1900 and 2100; unsupported dates return validation errors. California habitat scoring uses absolute modeled exposure with a fixed reference, so open-water detours cannot dilute an unchanged habitat passage. See `backend/DATA.md` for the normalization.
 
 ## Structure
 

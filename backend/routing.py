@@ -143,7 +143,7 @@ def world_paths(origin,dest):
 def _cached_world_paths(origin_id,dest_id):
     ports={port['id']:port for port in PORTS}
     origin,dest=ports[origin_id],ports[dest_id]
-    found=[]
+    found=[]; signatures=set()
     for restrictions in RESTRICTION_SETS:
         try:
             feature=_searoute.searoute(
@@ -154,7 +154,13 @@ def _cached_world_paths(origin_id,dest_id):
             pts=unwrap([[lat,lon] for lon,lat in geometry])
             length=path_length(pts)
             if length<=0: continue
-            if all(abs(length-other[0])>1 for other in found): found.append((length,pts))
+            signature=[]
+            for lat,lon in pts:
+                point=(round(lat,6),round(lon,6))
+                if not signature or signature[-1]!=point: signature.append(point)
+            signature=tuple(signature)
+            if signature not in signatures:
+                signatures.add(signature); found.append((length,pts))
         except Exception:
             continue
     if not found: raise RoutePlanningError('No sea passage could be calculated between these ports. Try a different port pair.')

@@ -2,10 +2,18 @@
 import math
 from .cargo_model import prepared_objective, score_candidate
 
-OPTIMIZER_VERSION = 'deadline-speed-v2'
+OPTIMIZER_VERSION = 'deadline-speed-v3'
 SPEED_RESOLUTION = .01
 PROTECTED_SPEED_RESOLUTION = .1
 MIN_PROTECTED_SPEED = 5
+HABITAT_REFERENCE_NM = 50
+HABITAT_MODEL_VERSION = "absolute-exposure-v1"
+
+
+def habitat_protection(whale_distance, speed, activity):
+    """Fixed exposure baseline prevents open-water detours diluting habitat risk."""
+    exposure = whale_distance*(speed/10)**2*activity
+    return 100*HABITAT_REFERENCE_NM/(HABITAT_REFERENCE_NM+exposure)
 
 
 def search_passages(paths, p, outcomes, habitat_assessed):
@@ -34,7 +42,7 @@ def search_passages(paths, p, outcomes, habitat_assessed):
             for tick in range(math.floor((zone_max-MIN_PROTECTED_SPEED)*10+1e-9)+1)} | {zone_max}) if path['protected_distance'] else [zone_max]
         for zone_speed in zone_speeds:
             zone_hours = path['protected_distance']/zone_speed
-            protection = max(0,100-path['whale_distance']*(zone_speed/10)**2/max(1,path['distance'])*100*p.whale_activity) if habitat_assessed else None
+            protection = habitat_protection(path['whale_distance'],zone_speed,p.whale_activity) if habitat_assessed else None
             zone_fuel = fuel_factor*path['protected_distance']*zone_speed**2
             habitat_cost = weights['habitat']*((100-protection)/100) if protection is not None else 0
             for speed,open_hours,open_fuel in open_options:
@@ -75,7 +83,8 @@ def search_passages(paths, p, outcomes, habitat_assessed):
         'eco': cheapest if feasible else earliest,
     }
     return choices, {
-        'version':OPTIMIZER_VERSION,'status':'feasible' if feasible else 'infeasible',
+        'version':OPTIMIZER_VERSION,'habitat_model_version':HABITAT_MODEL_VERSION,
+        'habitat_reference_nm':HABITAT_REFERENCE_NM,'status':'feasible' if feasible else 'infeasible',
         'protected_speed_resolution_knots':PROTECTED_SPEED_RESOLUTION,
         'min_protected_speed':MIN_PROTECTED_SPEED,'max_protected_speed':min(10,p.max_speed),
         'speed_resolution_knots':SPEED_RESOLUTION,'min_speed':min_tick/100,'max_speed':max_tick/100,
