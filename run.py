@@ -21,7 +21,7 @@ sources=[ROOT/'index.html',ROOT/'package.json',ROOT/'vite.config.js',*list((ROOT
 index=ROOT/'dist'/'index.html'
 if not index.exists() or any(p.stat().st_mtime>index.stat().st_mtime for p in sources):
     subprocess.run([npm,'run','build'],check=True)
-print('\nTideway is ready at http://localhost:8000\nPress Ctrl+C to stop.\n',flush=True)
+print('\nBon Voyage is ready at http://localhost:8000\nPress Ctrl+C to stop.\n',flush=True)
 import uvicorn
 uvicorn.run('backend.main:app',host='127.0.0.1',port=int(os.environ.get('PORT','8000')))
 

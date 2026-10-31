@@ -349,11 +349,11 @@ export default function App() {
       <aside className="sidebar">
         <button
           className="brand"
-          aria-label="Tideway home"
+          aria-label="Bon Voyage home"
           onClick={() => switchView("planner")}
         >
           <Waves size={31} />
-          <span>tideway.</span>
+          <span>Bon Voyage</span>
         </button>
         <div className="workspace">
           <div>
@@ -415,7 +415,7 @@ export default function App() {
           <div className="header-actions">
             <button
               className="icon-button"
-              aria-label="How Tideway works"
+              aria-label="How Bon Voyage works"
               onClick={() => setModal("help")}
             >
               <HelpCircle size={18} />
@@ -1140,7 +1140,7 @@ export default function App() {
           ) : (
             <Insights voyages={voyages} onPlan={newVoyage} />
           )}
-          <footer><span>tideway.</span><span>California coastal planning</span></footer>
+          <footer><span>Bon Voyage</span><span>California coastal planning</span></footer>
         </div>
       </main>
       {modal === "auth" && (
@@ -1158,7 +1158,7 @@ export default function App() {
       {modal === "help" && (
         <Modal
           title="Three priorities. One passage."
-          eyebrow="THE TIDEWAY APPROACH"
+          eyebrow="THE BON VOYAGE APPROACH"
           onClose={closeModal}
         >
           <p>

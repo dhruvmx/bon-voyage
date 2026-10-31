@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from backend import main
 
-class TidewayTests(unittest.TestCase):
+class BonVoyageTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(dir=main.ROOT / "data"); self.old=main.DB
         main.DB=Path(self.temp.name)/'test.sqlite3';main.init_db()

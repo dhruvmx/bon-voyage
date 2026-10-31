@@ -9,10 +9,10 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from .routing import PORTS, CARGOS, ZONES, plan
 
 ROOT=Path(__file__).resolve().parents[1]
-DB=Path(os.environ.get('TIDEWAY_DB',str(ROOT/'data'/'tideway.sqlite3')))
+DB=Path(os.environ.get('BON_VOYAGE_DB',os.environ.get('TIDEWAY_DB',str(ROOT/'data'/'tideway.sqlite3'))))
 DB.parent.mkdir(parents=True,exist_ok=True)
-SECURE=os.environ.get('COOKIE_SECURE','false').lower()=='true'
-app=FastAPI(title='Tideway API',version='2.0.0')
+SECURE=os.environ.get('COOKIE_SECURE','true' if os.environ.get('VERCEL') else 'false').lower()=='true'
+app=FastAPI(title='Bon Voyage API',version='2.0.0')
 
 @contextmanager
 def db():
@@ -245,5 +245,6 @@ def frontend(path:str):
     if path.startswith('api/'): raise HTTPException(404,'API endpoint not found.')
     if (ROOT/'dist'/'index.html').exists(): return FileResponse(ROOT/'dist'/'index.html')
     raise HTTPException(503,'Build the frontend with npm run build, or run the Vite dev server on port 5173.')
+
 
 

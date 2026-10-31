@@ -26,7 +26,7 @@ export async function api(path, options = {}) {
   }
   return data;
 }
-export function download(data, filename = "tideway-voyage.json") {
+export function download(data, filename = "bon-voyage.json") {
   const url = URL.createObjectURL(
     new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
   );
