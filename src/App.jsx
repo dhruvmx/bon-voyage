@@ -28,6 +28,7 @@ import VoyageMap from "./Map";
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
 import Intro from "./Intro";
+import { shouldShowIntro } from "./intro";
 import SidebarControls from "./SidebarControls";
 import CargoPicker from "./CargoPicker";
 import { cargoItems, manifestInputs, manifestError, whaleAssessed, formatHours, formatDuration } from "./cargo";
@@ -190,9 +191,7 @@ export default function App() {
     [progress, setProgress] = useState(0),
     [playing, setPlaying] = useState(false),
     [query, setQuery] = useState("");
-  const [introState, setIntroState] = useState("playing"),
-    [introRevealed, setIntroRevealed] = useState(false),
-    introLoginShown = useRef(false);
+  const [introState, setIntroState] = useState(() => shouldShowIntro() ? "playing" : "done");
   const closeModal = useCallback(() => setModal(null), []),
     requestNo = useRef(0),
     desiredRoute = useRef(null),
@@ -449,7 +448,7 @@ export default function App() {
   const ready = route && !calculating && !planError && !capacityError;
   return (
     <>
-      <aside className="sidebar">
+      <aside className="sidebar" inert={introState === "playing"}>
         <div className="sidebar-heading">
         <button
           className="brand"
@@ -505,7 +504,7 @@ export default function App() {
         </button>
         </div>
       </aside>
-      <main>
+      <main inert={introState === "playing"}>
         <header>
           <div className="breadcrumb">
             Workspace <span>/</span>{" "}
@@ -1153,7 +1152,6 @@ export default function App() {
       </main>
       {introState === "playing" && (
         <Intro
-          onReveal={() => setIntroRevealed(true)}
           onDone={() => setIntroState("done")}
         />
       )}
