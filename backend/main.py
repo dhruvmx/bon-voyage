@@ -255,7 +255,7 @@ def favicon(): return FileResponse(ROOT/'public'/'favicon.svg',media_type='image
 @app.get('/{path:path}',include_in_schema=False)
 def frontend(path:str):
     if path.startswith('api/'): raise HTTPException(404,'API endpoint not found.')
-    if (ROOT/'dist'/'index.html').exists(): return FileResponse(ROOT/'dist'/'index.html')
+    if (ROOT/'dist'/'index.html').exists(): return FileResponse(ROOT/'dist'/'index.html', headers={'Cache-Control': 'no-store'})
     raise HTTPException(503,'Build the frontend with npm run build, or run the Vite dev server on port 5173.')
 
 
