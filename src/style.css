@@ -8,7 +8,7 @@
   --tint: #eef1e5;
   --border: #daddd1;
   --danger: #a54432;
-  --radius: 50%;
+  --radius: 20%;
   --space: 24px;
   font: 16px/1.5 system-ui, sans-serif;
   color: var(--ink);
