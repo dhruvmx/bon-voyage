@@ -74,7 +74,8 @@
   .sidebar-resizer:focus-visible { outline: none; }
   .sidebar-resizing, .sidebar-resizing * { cursor: col-resize !important; user-select: none !important; }
   .brand { display: flex; align-items: center; gap: 10px; padding: 4px; font: 600 28px Georgia, serif; letter-spacing: -1px; }
-  .brand svg { color: var(--accent); }
+  .brand-logo { display: block; flex: 0 0 44px; width: 44px; height: 26px; background: #073675; -webkit-mask: url("./assets/brand-logo.png") center / contain no-repeat; mask: url("./assets/brand-logo.png") center / contain no-repeat; }
+  :root[data-mode="dark"] .brand-logo { background: #a5c9ff; }
   .workspace { margin: 36px 4px; overflow-wrap: anywhere; font-size: 14px; }
   nav { display: flex; flex-direction: column; gap: 8px; }
   nav button { display: flex; align-items: center; gap: 12px; padding: 12px; text-align: left; font-size: 14px; }
