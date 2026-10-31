@@ -34,10 +34,10 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 
 1. Explore the dashboard as a guest. Switch cargo categories, ports, arrival windows, temperatures, and map layers.
 2. Click **Sign up** and create your own account. No seeded credentials are needed.
-3. Open **My fleet**, add a vessel, and enter maximum speed, consumption at 18 knots, and cargo capacity.
+3. Open **My fleet**, add a vessel, and enter minimum open-water speed, maximum speed, consumption at 18 knots, and cargo capacity.
 4. Return to the planner, expand **Vessel, cargo & departure details**, and assign the vessel.
 5. Search the 255-product cargo catalogue or add custom cargo. Add up to 10 distinct items, then expand each item to edit its weight, age, shelf life, and temperature. Set departure time and an arrival window of up to 90 days.
-6. Compare the three passages and select one. Play or scrub the voyage on the map.
+6. Set the latest acceptable arrival, then compare the recommended balance, fastest feasible arrival, and lowest fuel within the deadline. Play or scrub the voyage on the map.
 7. Save your passage with a name, notes, and operational status.
 8. Open **My voyages** to search, reopen, edit, export, or delete saved voyages. Open **Impact overview** for aggregate metrics.
 9. Use the profile icon to edit your name, organization, and role, change your password, or log out. Log back in to retrieve the same data.
@@ -89,7 +89,7 @@ Interactive API documentation: http://localhost:8000/docs
 
 `GET /api/catalog` includes `cargo_products`, `max_cargo_items`, `max_arrival_hours`, and `data_coverage`. Send an optional `cargo_items` array to `/api/plan` or voyage endpoints. Each item has a catalogue `product_id` (or `null` and a custom `name`), `weight` in tonnes, and optional `profile`, `temperature`, `shelf_life` and `cargo_age` in hours. Catalogue identity/profile is resolved server-side. The server rejects more than 10 items, duplicate names, invalid handling values, and total cargo over 100,000 tonnes. Legacy single-cargo requests remain valid.
 
-Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. When no genuinely different geometric alternatives exist, options share a sea path with different speed profiles; `distinct_paths` reports the actual count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
+Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. The optimizer searches every candidate path at 0.01-knot open-water speed intervals within vessel limits. The arrival window is a maximum, with no waiting added. Results expose ETA, deadline slack, search metadata, and explicit infeasibility when even the fastest candidate is late. Identical path/speed options are labeled; `distinct_paths` reports the actual geometric count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
 
 ## Structure
 

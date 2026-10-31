@@ -47,3 +47,11 @@ export function formatHours(hours) {
   const days = Math.floor(hours / 24), remainder = hours % 24;
   return days ? `${days}d${remainder ? ` ${remainder}h` : ""}` : `${hours}h`;
 }
+
+export function formatDuration(hours) {
+  if (!Number.isFinite(hours)) return "—";
+  const total = Math.max(0, Math.round(hours * 60));
+  if (total === 0 && hours > 0) return "<1 min";
+  const days = Math.floor(total / 1440), h = Math.floor(total % 1440 / 60), minutes = total % 60;
+  return [days && `${days}d`, h && `${h}h`, minutes && `${minutes}m`].filter(Boolean).join(" ") || "0 min";
+}

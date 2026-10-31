@@ -8,7 +8,8 @@ from functools import lru_cache
 from threading import Lock
 from types import SimpleNamespace
 from .cargo_catalog import PRODUCT_BY_ID
-from .cargo_model import MODEL_VERSION, evaluate_cargo, product_model, score_route
+from .cargo_model import MODEL_VERSION, evaluate_cargo, product_model
+from .optimizer import search_passages, OPTIMIZER_VERSION
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -67,8 +68,7 @@ for profile_id,profile in CARGOS.items():
     profile['decay']=profile['model']['decay_percent_per_day']/24
     profile['weights']=list(profile['model']['routing_weights'].values())
 
-# (route id, display name, cruise speed in knots)
-PASSAGES = [("direct","Freshness first",18.5),("balanced","Balanced passage",16),("eco","Ocean first",13.5)]
+PATH_LABELS = {"direct":"Coastal corridor","balanced":"Offshore corridor","eco":"Outer offshore corridor"}
 # Canal / strait restrictions tried to get genuinely different world passages
 RESTRICTION_SETS = [[], ["suez"], ["panama"], ["malacca"]]
 # searoute mutates restrictions on its shared in-memory graph.
@@ -126,7 +126,7 @@ def california_paths(origin,dest):
     offsets={'direct':0,'balanced':.25,'eco':.65}
     harbor=lambda port: ([[37.795,-122.32],[37.82,-122.40],[37.81,-122.49],[37.78,-122.53],port['gate']] if port['id']=='oakland' else [[port['lat'],port['lon']],port['gate']])
     paths={}
-    for route_id,_,_ in PASSAGES:
+    for route_id in PATH_LABELS:
         mids=[[lat,lon-offsets[route_id]] for lat,lon in corridor if lo['gate'][0]+.005<lat<hi['gate'][0]-.005]
         points=harbor(lo)+mids+list(reversed(harbor(hi)))
         if reverse: points.reverse()
@@ -162,7 +162,7 @@ def _cached_world_paths(origin_id,dest_id):
     chosen=[pts for _,pts in found[:3]]
     while len(chosen)<3: chosen.append(chosen[0])
     step=max(2.0,min(12.0,max(path_length(c) for c in chosen)/800))
-    return {rid:dense(pts,step,4) for (rid,_,_),pts in zip(PASSAGES,chosen)}
+    return {rid:dense(pts,step,4) for rid,pts in zip(PATH_LABELS,chosen)}
 
 def cargo_outcomes(p,hours):
     items=p.cargo_items if getattr(p,'cargo_items',None) else [SimpleNamespace(
@@ -175,45 +175,80 @@ def cargo_outcomes(p,hours):
         outcomes.append(evaluate_cargo(item,model,hours))
     return outcomes
 
-def plan(p):
-    ports={x['id']:x for x in PORTS}; origin=ports[p.origin]; dest=ports[p.destination]
-    california=origin['id'] in CA_IDS and dest['id'] in CA_IDS
-    paths=california_paths(origin,dest) if california else world_paths(origin,dest)
-    rows=[]
-    for route_id,name,cruise in PASSAGES:
-        coords=paths[route_id]; segments=[]
+def prepare_paths(paths,california):
+    unique=[]; seen=set()
+    for path_id,coords in paths.items():
+        signature=tuple(map(tuple,coords))
+        if signature in seen: continue
+        seen.add(signature)
+        segments=[]
         for a,b in zip(coords,coords[1:]):
-            midpoint=[(a[0]+b[0])/2,(a[1]+b[1])/2]; zone=zone_at(midpoint)
-            segments.append({'from':a,'to':b,'distance':distance(a,b),'zone':zone['name'] if zone else None,'kind':zone['kind'] if zone else 'open'})
-        total=sum(x['distance'] for x in segments); protected=sum(x['distance'] for x in segments if x['zone']); open_nm=total-protected
-        max_speed=p.max_speed; zone_speed=min(10,max_speed); zone_hours=protected/zone_speed
-        required=open_nm/max(.01,p.arrival_window-zone_hours)
-        speed=min(max_speed,max(min(cruise,max_speed),required))
-        hours=zone_hours+open_nm/speed
-        outcomes=cargo_outcomes(p,hours)
-        total_weight=sum(item['weight'] for item in outcomes)
-        freshness=sum(item['freshness']*item['weight'] for item in outcomes)/total_weight
-        remaining=min((item['shelf_remaining'] for item in outcomes if item['perishable']),default=None)
-        # Vessel fuel/day is the reference at 18 knots; power follows speed cubed.
-        fuel=0; exposure=0
-        for s in segments:
-            s['speed']=zone_speed if s['zone'] else speed
-            s['hours']=s['distance']/s['speed']; fuel+=p.fuel_per_day/24*(s['speed']/18)**3*s['hours']
-            if s['kind']=='whale': exposure+=s['distance']*(s['speed']/10)**2
-        protection=max(0,100-exposure/max(1,total)*100*p.whale_activity)
-        eta=(datetime.fromisoformat(p.departure.replace('Z','+00:00'))+timedelta(hours=hours)).astimezone(timezone.utc).isoformat()
-        feasible=hours<=p.arrival_window+.001
+            zone=zone_at([(a[0]+b[0])/2,(a[1]+b[1])/2])
+            segments.append({'from':a,'to':b,'distance':distance(a,b),
+                'zone':zone['name'] if zone else None,'kind':zone['kind'] if zone else 'open'})
+        total=sum(segment['distance'] for segment in segments)
+        protected=sum(segment['distance'] for segment in segments if segment['zone'])
+        unique.append({'id':path_id,'name':PATH_LABELS.get(path_id,path_id) if california else f"Sea path {len(unique)+1}",
+            'coordinates':coords,'segments':segments,'distance':total,'protected_distance':protected,
+            'open_distance':total-protected,'whale_distance':sum(segment['distance'] for segment in segments if segment['kind']=='whale')})
+    if not unique: raise RoutePlanningError('No candidate sea paths are available.')
+    return unique
 
-        rows.append(dict(id=route_id,name=name,distance=round(total,1),protected_distance=round(protected,1),open_distance=round(open_nm,1),speed=round(speed,2),hours=round(hours,2),freshness=round(freshness,2),fuel=round(fuel,2),co2=round(fuel*3.114,2),protection=round(protection,1) if california else None,whale_assessed=california,cargo_results=outcomes,worst_cargo_freshness=min(item['freshness'] for item in outcomes),eta=eta,feasible=feasible,shelf_remaining=round(remaining,1) if remaining is not None else None,coordinates=coords,segments=segments))
-    baseline=rows[0]['distance']/18*p.fuel_per_day/24
-    for r in rows:
-        r['fuel_delta']=round((r['fuel']/max(.01,baseline)-1)*100,1)
-        r['score'],r['newly_expired_tonnes'],r['score_breakdown']=score_route(r,baseline,california)
-        r['cargo_model_version']=MODEL_VERSION
-    best=min(rows,key=lambda r:(not r['feasible'],r['newly_expired_tonnes'],r['score']))
-    mode='California coastal planning scenario' if california else 'Global sea-lane planning (searoute network)'
+
+def materialize_route(candidate,mode,p,california,reference_fuel):
+    path=candidate['path']; hours=candidate['hours']; speed=candidate['speed']
+    outcomes=cargo_outcomes(p,hours)
+    total_weight=sum(item['weight'] for item in outcomes)
+    remaining=min((item['shelf_remaining'] for item in outcomes if item['perishable']),default=None)
+    feasible=hours<=p.arrival_window+1e-9
+    names={'balanced':'Recommended balance','direct':'Fastest feasible arrival','eco':'Lowest fuel within deadline'}
+    if not feasible: names={'balanced':'Earliest available passage','direct':'Earliest available passage','eco':'Earliest available passage'}
+    departure=datetime.fromisoformat(p.departure.replace('Z','+00:00'))
+    segments=[]
+    for segment in path['segments']:
+        segment_speed=candidate['zone_speed'] if segment['zone'] else speed
+        segments.append({**segment,'speed':segment_speed,'hours':segment['distance']/segment_speed})
+    return {
+        'id':mode,'name':names[mode],'path_id':path['id'],'path_name':path['name'],
+        'distance':round(path['distance'],2),'protected_distance':round(path['protected_distance'],2),
+        'open_distance':round(path['open_distance'],2),'speed':speed,'hours':round(hours,4),
+        'freshness':round(sum(item['freshness']*item['weight'] for item in outcomes)/total_weight,2),
+        'fuel':round(candidate['fuel'],4),'co2':round(candidate['fuel']*3.114,4),
+        'fuel_delta':round((candidate['fuel']/reference_fuel-1)*100,1),
+        'protection':round(candidate['protection'],1) if california else None,'whale_assessed':california,
+        'cargo_results':outcomes,'worst_cargo_freshness':min(item['freshness'] for item in outcomes),
+        'eta':(departure+timedelta(hours=hours)).astimezone(timezone.utc).isoformat(),
+        'feasible':feasible,'slack_hours':round(p.arrival_window-hours,4),
+        'shelf_remaining':remaining,'score':candidate['score'],'score_breakdown':candidate['score_breakdown'],
+        'newly_expired_tonnes':candidate['newly_expired_tonnes'],
+        'cargo_model_version':MODEL_VERSION,'optimizer_version':OPTIMIZER_VERSION,
+        'coordinates':path['coordinates'],'segments':segments,
+    }
+
+
+def plan(p):
+    ports={port['id']:port for port in PORTS}; origin=ports[p.origin]; dest=ports[p.destination]
+    california=origin['id'] in CA_IDS and dest['id'] in CA_IDS
+    geometry=california_paths(origin,dest) if california else world_paths(origin,dest)
+    paths=prepare_paths(geometry,california)
+    try:
+        choices,optimization=search_passages(paths,p,cargo_outcomes(p,0),california)
+    except ValueError as error:
+        raise RoutePlanningError(str(error)) from error
+    rows=[materialize_route(choices[mode],mode,p,california,optimization['reference_fuel_tonnes'])
+          for mode in ['balanced','direct','eco']]
+    for index,row in enumerate(rows):
+        row['same_as']=next((prior['id'] for prior in rows[:index]
+            if (prior['path_id'],prior['speed'])==(row['path_id'],row['speed'])),None)
+    departure=datetime.fromisoformat(p.departure.replace('Z','+00:00'))
     coverage={**DATA_COVERAGE,'whale':{**DATA_COVERAGE['whale'],'score_available':california,
         'status':'scenario' if california else 'unassessed',
         'summary':'California scenario estimate; not a live safety or compliance assessment.' if california else 'Whale habitat coverage is incomplete for this passage. No global safety score is available.'}}
-    distinct=len({tuple(map(tuple,coords)) for coords in paths.values()})
-    return {'routes':rows,'recommended':best['id'],'zones':ZONES,'data_mode':mode,'data_coverage':coverage,'distinct_paths':distinct,'cargo_model_version':MODEL_VERSION}
+    return {
+        'routes':rows,'recommended':'balanced','status':optimization['status'],
+        'zones':ZONES,'data_mode':'California coastal planning scenario' if california else 'Global sea-lane planning (searoute network)',
+        'data_coverage':coverage,'distinct_paths':len(paths),'cargo_model_version':MODEL_VERSION,
+        'optimization':optimization,'deadline_hours':p.arrival_window,
+        'deadline_at':(departure+timedelta(hours=p.arrival_window)).astimezone(timezone.utc).isoformat(),
+        'earliest_eta':(departure+timedelta(hours=optimization['earliest_possible_hours'])).astimezone(timezone.utc).isoformat(),
+    }

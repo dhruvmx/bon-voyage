@@ -30,7 +30,7 @@ import Appearance from "./Appearance";
 import Intro from "./Intro";
 import SidebarControls from "./SidebarControls";
 import CargoPicker from "./CargoPicker";
-import { cargoItems, manifestInputs, manifestError, whaleAssessed, formatHours } from "./cargo";
+import { cargoItems, manifestInputs, manifestError, whaleAssessed, formatHours, formatDuration } from "./cargo";
 
 const freshInputs = () => ({
   origin: "la",
@@ -44,6 +44,7 @@ const freshInputs = () => ({
   cargo_age: 0,
   arrival_window: 36,
   max_speed: 24,
+  min_speed: 8,
   fuel_per_day: 35,
   whale_activity: 1,
   departure: new Date(Date.now() + 3600000).toISOString().slice(0, 16) + "Z",
@@ -52,6 +53,7 @@ const defaultVessel = {
   name: "",
   imo: "",
   max_speed: 24,
+  min_speed: 8,
   fuel_per_day: 35,
   capacity: 12000,
 };
@@ -233,7 +235,7 @@ export default function App() {
           .then((x) => {
             if (n === requestNo.current) {
               setResult(x);
-              setSelected(desiredRoute.current || x.recommended);
+              setSelected(x.status === "infeasible" ? x.recommended : (desiredRoute.current || x.recommended));
               desiredRoute.current = null;
             }
           })
@@ -286,6 +288,7 @@ export default function App() {
       setInputs((p) => ({
         ...p,
         max_speed: v.max_speed,
+        min_speed: v.min_speed ?? Math.min(8, v.max_speed),
         fuel_per_day: v.fuel_per_day,
       }));
   };
@@ -491,7 +494,7 @@ export default function App() {
                 className="button secondary"
                 disabled={!ready}
                 onClick={() =>
-                  download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage })
+                  download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at })
                 }
               >
                 <Download size={15} /> Export voyage
@@ -535,6 +538,12 @@ export default function App() {
             </div>
           ) : view === "planner" ? (
             <>
+              {route && result.deadline_at && <section className="panel deadline-summary" aria-label="Deadline and arrival estimate">
+                <div><small>Latest acceptable arrival</small><strong>{date(result.deadline_at)}</strong></div>
+                <div><small>Estimated arrival · selected passage</small><strong>{date(route.eta)}</strong></div>
+                <div><small>{route.feasible ? "Time before deadline" : "Time past deadline"}</small><strong>{formatDuration(Math.abs(route.slack_hours))}</strong></div>
+                <p role="status">{calculating ? "Updating path and speed estimates…" : result.status === "infeasible" ? "Deadline infeasible at the allowed speeds. Showing the earliest available estimate." : result.optimization?.deadline_binding ? "The deadline requires a faster cruise than the unconstrained recommendation. Earlier arrival is still allowed." : "The recommended path and speed are chosen for cargo and operating costs. No waiting is added to fill the allowance."}</p>
+              </section>}
               <section className="stats">
                 <Stat
                   label={manifest.length > 1 ? "Cargo freshness (avg.)" : "Arrival freshness"}
@@ -544,7 +553,7 @@ export default function App() {
                   icon={Leaf}
                 />
                 <Stat
-                  label="Estimated arrival"
+                  label="Estimated voyage duration"
                   value={route ? route.hours.toFixed(1) : "—"}
                   unit="hrs"
                   sub={
@@ -655,7 +664,7 @@ export default function App() {
                     <CargoPicker products={catalog.cargo_products || []} profiles={catalog.cargo_types}
                       items={manifest} onChange={setManifest} results={route?.cargo_results} calculating={calculating} />
                     <label className="range-label" htmlFor="arrival-window">
-                      Arrival window{" "}
+                      Latest acceptable arrival{" "}
                       <strong>{formatHours(inputs.arrival_window)}</strong>
                     </label>
                     <input
@@ -669,7 +678,8 @@ export default function App() {
                       }
                     />
                     <div className="arrival-scale"><span>1 hour</span><span>90 days</span></div>
-                    <Field label="Arrival window (hours)" type="number" min="1" max="2160" step="1"
+                    <small className="cargo-hint">A maximum time allowance. Earlier arrival is allowed; the planner chooses the path and speed.</small>
+                    <Field label="Deadline from departure (hours)" type="number" min="1" max="2160" step="1"
                       value={inputs.arrival_window} onChange={(event) => change("arrival_window", Number(event.target.value))} />
                     <details className="advanced">
                       <summary>
@@ -702,12 +712,18 @@ export default function App() {
                             type="number"
                             min="5"
                             max="35"
+                            step="0.01"
                             value={inputs.max_speed}
                             onChange={(e) => {
                               setVesselId("");
-                              change("max_speed", Number(e.target.value));
+                              const maximum = Number(e.target.value);
+                              setInputs((previous) => ({ ...previous, max_speed: maximum, min_speed: Math.min(previous.min_speed ?? 8, maximum) }));
                             }}
                           />
+                          <Field label="Minimum open-water speed (kn)" type="number" min="5" max={inputs.max_speed} step="0.01"
+                            value={inputs.min_speed ?? Math.min(8, inputs.max_speed)} onChange={(event) => {
+                              setVesselId(""); change("min_speed", Number(event.target.value));
+                            }} />
                           <Field
                             label="Fuel at 18 kn (t/day)"
                             type="number"
@@ -764,15 +780,13 @@ export default function App() {
                     />
                     {route && !route.feasible && (
                       <div className="warning">
-                        Arrival window cannot be met at {inputs.max_speed}{" "}
-                        knots. Earliest arrival on this passage:{" "}
-                        {route.hours.toFixed(1)} hours.
+                        No candidate passage can meet this deadline within the vessel limits. Earliest estimated arrival: {date(result.earliest_eta)} ({formatDuration(result.optimization.earliest_possible_hours)} after departure). Extend the deadline or review vessel limits.
                       </div>
                     )}
                     {route &&
                       (route.worst_cargo_freshness ?? route.freshness) < 70 && (
                         <div className="warning">
-                          One or more cargo items have low freshness. Review the item-level results, handling values, or arrival window.
+                          One or more cargo items have low freshness. Review the item-level results, handling values, or arrival deadline.
                         </div>
                       )}
                     <button
@@ -820,11 +834,11 @@ export default function App() {
                     </p>
                   </div>
                   <span className="stamp">
-                    {calculating ? "Recalculating…" : `3 passage options · ${result?.distinct_paths || 0} distinct paths`}
+                    {calculating ? "Optimizing path and speed…" : result?.status === "infeasible" ? "No deadline-feasible passage" : `3 options · ${result?.distinct_paths || 0} candidate sea paths`}
                   </span>
                 </div>
                 <div className="route-cards">
-                  {result?.routes.map((r) => (
+                  {result?.routes.filter((option) => result.status !== "infeasible" || option.id === result.recommended).map((r) => (
                     <button
                       key={r.id}
                       className={
@@ -839,14 +853,15 @@ export default function App() {
                           {selected === r.id && <span />}
                         </span>
                       </div>
+                      <small className="route-path">{r.path_name} · {r.speed.toFixed(2)} kn open water</small>
                       <div className="route-metrics">
                         <div>
                           <strong>
-                            {r.hours.toFixed(1)}
-                            <em> hrs</em>
+                            {formatDuration(r.hours)}
                           </strong>
-                          <small>Transit</small>
+                          <small>Estimated duration</small>
                         </div>
+                        <div><strong>{r.fuel.toFixed(1)}<em> t</em></strong><small>Estimated fuel</small></div>
                         <div>
                           <strong>{r.freshness.toFixed(1)}%</strong>
                           <small>Freshness</small>
@@ -862,10 +877,12 @@ export default function App() {
                       <div className="route-bottom">
                         <span>
                           {r.distance} nm ·{" "}
-                          {r.feasible ? "Within window" : "Window exceeded"}
+                          {r.feasible ? `${formatDuration(r.slack_hours)} before deadline` : `${formatDuration(-r.slack_hours)} past deadline`}
                         </span>
-                        {result.recommended === r.id && <b>Recommended ↗</b>}
+                        {result.recommended === r.id && <b>{result.status === "infeasible" ? "Earliest available" : "Recommended ↗"}</b>}
                       </div>
+                      {r.same_as && <small className="route-note">Same path and speed as {result.routes.find((option) => option.id === r.same_as)?.name.toLowerCase()}.</small>}
+                      {r.newly_expired_tonnes > 0 && <small className="route-note cargo-at-risk">{r.newly_expired_tonnes.toLocaleString()} t would exhaust its quality budget.</small>}
                     </button>
                   ))}
                 </div>
@@ -874,7 +891,7 @@ export default function App() {
                 <section className="panel speed-panel">
                   <div className="speed-segments">
                     <div><strong>{Math.min(10, inputs.max_speed)} kn</strong><small>Modeled slow zones only</small></div>
-                    <div><strong>{route.speed.toFixed(1)} kn</strong><small>Open-water speed</small></div>
+                    <div><strong>{route.speed.toFixed(2)} kn</strong><small>Open-water speed</small></div>
                     <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Earliest quality horizon on arrival"}</small></div>
                   </div>
                 </section>
@@ -1051,8 +1068,8 @@ export default function App() {
                       <p>{v.imo ? "IMO " + v.imo : "IMO not specified"}</p>
                       <div className="saved-metrics">
                         <span>
-                          <strong>{v.max_speed} kn</strong>
-                          <small>Max speed</small>
+                          <strong>{v.min_speed ?? Math.min(8, v.max_speed)}–{v.max_speed} kn</strong>
+                          <small>Open-water range</small>
                         </span>
                         <span>
                           <strong>{v.fuel_per_day} t</strong>
@@ -1132,7 +1149,7 @@ export default function App() {
         >
           <p>
             Choose ports and cargo, then adjust arrival time, temperature, and
-            vessel specifications. Choose up to ten catalogue or custom cargo items. The Python planner compares three passage options across California corridors or global sea lanes.
+            vessel specifications. The arrival deadline is a maximum allowance. The planner searches candidate sea paths and operating speeds, then compares a recommended balance, the fastest feasible arrival, and the lowest fuel within the deadline.
           </p>
           <div className="info-box">
             <h3>What changes the route?</h3>
@@ -1152,11 +1169,12 @@ export default function App() {
       )}
       {modal === "save" && (
         <Modal
-          title={editingId ? "Update your passage." : "Your course is set."}
+          title={editingId ? "Update your passage." : route?.feasible ? "Your course is set." : "Save this late-arrival estimate."}
           eyebrow="SAVE TO YOUR WORKSPACE"
           onClose={closeModal}
         >
           <form onSubmit={saveVoyage}>
+            <p className="saved-deadline">Estimated arrival: {date(route.eta)}. Latest acceptable arrival: {date(result.deadline_at)}. {formatDuration(Math.abs(route.slack_hours))} {route.feasible ? "before" : "past"} the deadline.</p>
             <div className="confirmation">
               <strong>
                 {route?.hours.toFixed(1)}h <small>TRANSIT</small>
@@ -1428,6 +1446,7 @@ function VesselForm({ item, onClose, onSave }) {
         />
         <div className="two-fields">
           {[
+            ["min_speed", "Minimum open-water speed (kn)", 5, data.max_speed],
             ["max_speed", "Maximum speed (kn)", 5, 35],
             ["fuel_per_day", "Fuel at 18 kn (t/day)", 1, 500],
             ["capacity", "Cargo capacity (tonnes)", 1, 500000],
@@ -1440,10 +1459,11 @@ function VesselForm({ item, onClose, onSave }) {
               min={min}
               max={max}
               required
-              value={data[id]}
-              onChange={(e) =>
-                setData({ ...data, [id]: Number(e.target.value) })
-              }
+              value={data[id] ?? (id === "min_speed" ? Math.min(8, data.max_speed) : "")}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setData({ ...data, [id]: value, ...(id === "max_speed" ? { min_speed: Math.min(data.min_speed ?? 8, value) } : {}) });
+              }}
             />
           ))}
         </div>

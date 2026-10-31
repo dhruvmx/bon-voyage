@@ -76,15 +76,28 @@ def manifest_weights(outcomes, habitat_assessed):
 
 
 def score_route(route, reference_fuel, habitat_assessed):
-    outcomes = route["cargo_results"]
-    active = [item for item in outcomes if item["perishable"] and not item["expired_at_departure"]]
-    weights = manifest_weights(outcomes,habitat_assessed)
-    # Every component is in [0,1], rather than mixing percent points and tonnes.
-    components = {
-        "freshness": max((min(1,route["hours"]/item["departure_remaining_hours"]) for item in active),default=0),
-        "fuel": route["fuel"]/(route["fuel"]+reference_fuel),
-        "habitat": (100-route["protection"])/100 if habitat_assessed else None,
+    return score_candidate(route['hours'],route['fuel'],route['protection'],reference_fuel,
+                           prepared_objective(route['cargo_results'],habitat_assessed))
+
+
+def prepared_objective(outcomes, habitat_assessed):
+    """Cargo state/weights at departure are independent of path, speed and deadline."""
+    active = [item for item in outcomes if item['perishable'] and not item['expired_at_departure']]
+    return {
+        'weights': manifest_weights(outcomes,habitat_assessed),
+        'remaining_hours': min((item['departure_remaining_hours'] for item in active),default=None),
+        'expiry_budgets': [(item['departure_remaining_hours'],item['weight']) for item in active],
     }
+
+
+def score_candidate(hours, fuel, protection, reference_fuel, objective):
+    remaining = objective['remaining_hours']
+    components = {
+        'freshness': min(1,hours/remaining) if remaining is not None else 0,
+        'fuel': fuel/(fuel+reference_fuel),
+        'habitat': (100-protection)/100 if protection is not None else None,
+    }
+    weights = objective['weights']
     score = sum(weights[key]*(value or 0) for key,value in components.items())
-    newly_expired = sum(item["weight"] for item in active if item["expired_on_arrival"])
-    return score, newly_expired, {"weights":weights,"components":components,"score":score}
+    expired = sum(weight for budget,weight in objective['expiry_budgets'] if hours>=budget)
+    return score, expired, {'weights':weights,'components':components,'score':score}
