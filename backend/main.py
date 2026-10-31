@@ -6,7 +6,8 @@ from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
-from .routing import PORTS, CARGOS, ZONES, plan
+from .routing import PORTS, CARGOS, ZONES, plan, RoutePlanningError, DATA_COVERAGE
+from .cargo_catalog import PRODUCTS, PRODUCT_BY_ID
 from .database import connect, database_url, INTEGRITY_ERRORS
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -141,6 +142,29 @@ def password(p:PasswordChange,response:Response,user=Depends(current_user)):
         c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],))
     session(response,user['id']); return {'ok':True}
 
+class CargoItem(BaseModel):
+    product_id:str|None=Field(default=None,max_length=100)
+    name:str=Field(default='',max_length=100)
+    profile:str='electronics'
+    weight:float=Field(default=1,ge=.001,le=100000)
+    temperature:float|None=Field(default=None,ge=-30,le=40)
+    shelf_life:float|None=Field(default=None,gt=0,le=100000)
+    cargo_age:float=Field(default=0,ge=0,le=100000)
+
+    @model_validator(mode='after')
+    def resolve_product(self):
+        product=PRODUCT_BY_ID.get(self.product_id) if self.product_id else None
+        if self.product_id and not product: raise ValueError('Choose a supported cargo product or add a custom item.')
+        if product:
+            self.name=product['name']; self.profile=product['profile']
+        self.name=self.name.strip()
+        if not self.name: raise ValueError('Custom cargo needs a name.')
+        if self.profile not in CARGOS: raise ValueError('Choose a supported perishability profile.')
+        defaults=product or {'temperature':CARGOS[self.profile]['temperature'],'shelf_life':CARGOS[self.profile]['shelf']}
+        if self.temperature is None: self.temperature=defaults['temperature']
+        if self.shelf_life is None: self.shelf_life=defaults['shelf_life']
+        return self
+
 class PlanInput(BaseModel):
     origin:str='la'
     destination:str='oakland'
@@ -150,7 +174,8 @@ class PlanInput(BaseModel):
     temperature:float=Field(default=5,ge=-30,le=40)
     shelf_life:float=Field(default=336,gt=0,le=100000)
     cargo_age:float=Field(default=0,ge=0,le=100000)
-    arrival_window:float=Field(default=36,ge=1,le=720)
+    arrival_window:float=Field(default=36,ge=1,le=2160)
+    cargo_items:list[CargoItem]|None=Field(default=None,min_length=1,max_length=10)
     max_speed:float=Field(default=24,ge=5,le=35)
     fuel_per_day:float=Field(default=35,gt=0,le=500)
     whale_activity:float=Field(default=1,ge=.25,le=3)
@@ -160,13 +185,28 @@ class PlanInput(BaseModel):
         ids={x['id'] for x in PORTS}
         if self.origin not in ids or self.destination not in ids or self.origin==self.destination: raise ValueError('Choose two different supported ports.')
         if self.cargo_type not in CARGOS: raise ValueError('Choose a supported cargo category.')
+        if self.cargo_items is not None:
+            keys=[item.name.casefold() for item in self.cargo_items]
+            if len(set(keys))!=len(keys): raise ValueError('Each cargo item must be unique; combine its weight into one entry.')
+            total=sum(item.weight for item in self.cargo_items)
+            if total>100000: raise ValueError('Total cargo weight cannot exceed 100,000 tonnes.')
+            self.weight=round(total,6)
+            self.cargo_name=', '.join(item.name for item in self.cargo_items)[:100]
+            first=self.cargo_items[0]
+            self.cargo_type=first.profile; self.temperature=first.temperature
+            self.shelf_life=first.shelf_life; self.cargo_age=first.cargo_age
         dt=datetime.fromisoformat(self.departure.replace('Z','+00:00'))
         if not dt.tzinfo: raise ValueError('Departure needs a timezone.')
         return self
 @app.get('/api/catalog')
-def catalog(): return {'ports':PORTS,'cargo_types':CARGOS,'zones':ZONES}
+def catalog(): return {'ports':PORTS,'cargo_types':CARGOS,'cargo_products':PRODUCTS,'zones':ZONES,'data_coverage':DATA_COVERAGE,'max_cargo_items':10,'max_arrival_hours':2160}
+
+def safe_plan(p):
+    try: return plan(p)
+    except RoutePlanningError as error: raise HTTPException(error.status_code,str(error)) from error
+
 @app.post('/api/plan')
-def calculate(p:PlanInput): return plan(p)
+def calculate(p:PlanInput): return safe_plan(p)
 
 class Vessel(BaseModel):
     name:str=Field(min_length=2,max_length=100)
@@ -223,10 +263,10 @@ def voyage_data(p,user):
         with db() as c: vessel=json.loads(owned_record(c,'vessels',p.vessel_id,user)['data'])
         if p.inputs.weight>vessel['capacity']: raise HTTPException(422,'Cargo weight exceeds vessel capacity.')
         if p.inputs.max_speed>vessel['max_speed']: raise HTTPException(422,'Planning speed exceeds vessel maximum speed.')
-    result=plan(p.inputs)
+    result=safe_plan(p.inputs)
     chosen=next((r for r in result['routes'] if r['id']==p.route_id),None)
     if not chosen: raise HTTPException(422,'Choose a valid route.')
-    return {**p.model_dump(),'result':chosen}
+    return {**p.model_dump(),'result':chosen,'data_coverage':result['data_coverage'],'data_mode':result['data_mode']}
 @app.get('/api/voyages')
 def voyages(user=Depends(current_user)): return list_records('voyages',user)
 @app.post('/api/voyages',status_code=201)

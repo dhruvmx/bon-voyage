@@ -36,7 +36,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 2. Click **Sign up** and create your own account. No seeded credentials are needed.
 3. Open **My fleet**, add a vessel, and enter maximum speed, consumption at 18 knots, and cargo capacity.
 4. Return to the planner, expand **Vessel, cargo & departure details**, and assign the vessel.
-5. Enter cargo name, weight, age, shelf life, temperature, departure time, and whale activity.
+5. Search the 255-product cargo catalogue or add custom cargo. Add up to 10 distinct items, then expand each item to edit its weight, age, shelf life, and temperature. Set departure time and an arrival window of up to 90 days.
 6. Compare the three passages and select one. Play or scrub the voyage on the map.
 7. Save your passage with a name, notes, and operational status.
 8. Open **My voyages** to search, reopen, edit, export, or delete saved voyages. Open **Impact overview** for aggregate metrics.
@@ -47,7 +47,10 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Email/password signup and login; PBKDF2 salted password hashes; server-side opaque sessions; HttpOnly, SameSite cookies; login throttling and cross-origin write checks.
 - Server-enforced account isolation for vessel and voyage CRUD. Password changes revoke previous sessions.
 - Persistent Neon PostgreSQL storage in production. Local installs use SQLite; existing local data is retained. Database credentials remain in server-only environment variables.
-- Python route optimization over sampled geographic sea waypoints for Los Angeles, Oakland, San Diego, and Humboldt Bay, in either direction.
+- Python routing for 25 ports worldwide using the pinned, offline `searoute` network; California pairs retain their scenario corridors. Geometry is cached per port pair, and dateline crossings use continuous longitudes.
+- A searchable catalogue of 255 representative maritime commodities across 11 groups, plus custom cargo, with up to 10 items per voyage. This is a curated selection, not a measured ranking by trade volume. Handling defaults are editable planning assumptions.
+- Mixed-cargo freshness is calculated per item and averaged by mass. Recommendations also consider the most time-sensitive cargo, while capacity checks use the combined weight. Saved voyages and JSON exports retain the complete manifest; older single-cargo voyages remain supported.
+- Arrival windows range from 1 to 2,160 hours (90 days), with a slider and precise numeric entry.
 - Protected segment speeds at or below 10 knots, vessel maximum-speed limits, arrival feasibility, temperature-dependent freshness, shelf-life decay, cubic fuel calculation, CO₂ estimates, and whale exposure scores.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
@@ -55,7 +58,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Collapsible, resizable desktop sidebar with remembered width, keyboard resizing, and independent scrolling on short screens. The page and sidebar use themed scrollbars.
 - Five workspace themes (Ocean, Forest, Walnut, Sandstone, Slate) with light, dark, and system modes. Appearance preferences persist on the device and sync across open tabs.
 
-The map and coastline data are bundled and work offline. The California route and habitat datasets are included planning scenarios; API accounts or live AIS/whale feeds are not required. Planning and saved records work locally and on the public Vercel deployment.
+The map, sea-lane network, and coastline data are bundled and work offline after installation. No live AIS or whale feed is connected. California habitat/slow-zone overlays are illustrative scenarios; global whale habitat coverage is **unassessed**, and international routes return `protection: null`, not an inferred perfect score. The UI, saved records, exports, and impact averages preserve that distinction. See [data coverage](backend/DATA.md).
 
 ## Tests
 
@@ -65,6 +68,8 @@ npm run build
 ```
 
 Tests cover authentication, password changes, duplicate accounts, password hashing, profile updates, account isolation, CRUD, vessel constraints, persistent records, route geometry, speed limits, temperature response, arrival feasibility, invalid inputs, and cross-origin protection. They use temporary isolated databases.
+
+Additional checks cover international and Pacific dateline passages, readable missing-dependency/no-route errors, 90-day arrival windows, catalogue size and uniqueness, manifest limits and custom cargo, item-level freshness, canonical product identity, combined-weight capacity checks, and manifest persistence.
 
 ## API
 
@@ -80,6 +85,10 @@ Interactive API documentation: http://localhost:8000/docs
 | `GET/POST /api/vessels`, `PUT/DELETE /api/vessels/{id}` | Private fleet management |
 | `GET/POST /api/voyages`, `PUT/DELETE /api/voyages/{id}` | Private voyage management |
 | `GET /api/health` | Backend/database health |
+
+`GET /api/catalog` includes `cargo_products`, `max_cargo_items`, `max_arrival_hours`, and `data_coverage`. Send an optional `cargo_items` array to `/api/plan` or voyage endpoints. Each item has a catalogue `product_id` (or `null` and a custom `name`), `weight` in tonnes, and optional `profile`, `temperature`, `shelf_life` and `cargo_age` in hours. Catalogue identity/profile is resolved server-side. The server rejects more than 10 items, duplicate names, invalid handling values, and total cargo over 100,000 tonnes. Legacy single-cargo requests remain valid.
+
+Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. When no genuinely different geometric alternatives exist, options share a sea path with different speed profiles; `distinct_paths` reports the actual count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
 
 ## Structure
 

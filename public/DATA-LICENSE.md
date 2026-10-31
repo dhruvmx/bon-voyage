@@ -1,6 +1,6 @@
 # Map data
 
-The bundled coastline is derived from Natural Earth 1:50m admin-0 countries, clipped to the western North America planning area and rounded to four decimal places.
+The repository now bundles a simplified worldwide coastline for planning illustrations. The project's existing coastline attribution is to Natural Earth admin-0 country geometry; this generalized layer is not a navigational chart.
 
 Source: https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson
 

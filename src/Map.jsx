@@ -8,6 +8,7 @@ export default function VoyageMap({
   routes,
   zones,
   color,
+  coverage,
   progress,
   setProgress,
   playing,
@@ -43,6 +44,10 @@ export default function VoyageMap({
 	    // Allow infinite horizontal panning
 	    maxBounds: undefined,
 	    inertia: true,
+        // A queued Leaflet zoom transition can outlive a React unmount.
+        zoomAnimation: false,
+        markerZoomAnimation: false,
+        fadeAnimation: false,
     });
 
     map.current = instance;
@@ -153,7 +158,7 @@ export default function VoyageMap({
       )
     );
 
-    const resize = new ResizeObserver(() => instance.invalidateSize());
+    const resize = new ResizeObserver(() => { if (active) instance.invalidateSize(); });
     resize.observe(host.current);
 
     return () => {
@@ -165,7 +170,8 @@ export default function VoyageMap({
   }, []);
 
   useEffect(() => {
-    if (!map.current || !route) return;
+    if (!map.current) return;
+    if (!route) { overlays.current.clearLayers(); ship.current = null; return; }
     const group = overlays.current;
     group.clearLayers();
 
@@ -276,7 +282,7 @@ export default function VoyageMap({
       route.coordinates.at(-1),
     ]);
     if (initialBounds.current !== key) {
-      map.current.fitBounds(L.latLngBounds(route.coordinates).pad(0.15));
+      map.current.fitBounds(L.latLngBounds(route.coordinates).pad(0.15), { animate: false });
       initialBounds.current = key;
     }
   }, [route, routes, zones, color, layers]);
@@ -321,8 +327,8 @@ export default function VoyageMap({
         {showLayers && (
           <div className="layer-menu">
             {[
-              ["habitat", "Whale habitats"],
-              ["vsr", "Speed reduction zones"],
+              ["habitat", "Whale habitats (California scenario)"],
+              ["vsr", "Modeled slow zones (California)"],
               ["alternatives", "Alternative routes"],
             ].map(([id, label]) => (
               <label key={id}>
@@ -347,7 +353,7 @@ export default function VoyageMap({
           onClick={() =>
             route &&
             map.current?.fitBounds(
-              L.latLngBounds(route.coordinates).pad(0.15)
+              L.latLngBounds(route.coordinates).pad(0.15), { animate: false }
             )
           }
         >
@@ -365,7 +371,7 @@ export default function VoyageMap({
         </span>
         <span>
           <i style={{ background: "var(--protected)" }} /> 10 kn protected
-          transit
+          transit (scenario)
         </span>
         <span>
           <i className="habitat-key" /> Whale habitat
@@ -378,6 +384,11 @@ export default function VoyageMap({
           Map attribution ↗
         </a>
       </div>
+      {coverage?.whale && <div className="coverage-note" role="status">
+        <strong>{coverage.whale.score_available ? "California scenario coverage" : "Whale habitat coverage incomplete"}</strong>
+        <p>{coverage.whale.summary} {coverage.whale.note}</p>
+        <a href={coverage.whale.global_reference} target="_blank" rel="noreferrer">About worldwide habitat coverage ↗</a>
+      </div>}
       <div className="playback">
         <button
           className="play-button"
