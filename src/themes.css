@@ -1,0 +1,58 @@
+/* Each palette shares the same semantic tokens in light and dark mode. */
+:root, :root[data-theme="ocean"] {
+  --ink: #18343e; --muted: #526d76; --background: #f2f7f8;
+  --surface: #ffffff; --accent: #17677b; --tint: #e0eff2; --border: #d4e2e6;
+}
+:root[data-theme="forest"] {
+  --ink: #25392b; --muted: #5c6c5b; --background: #f4f6f0;
+  --surface: #fefffc; --accent: #3e683f; --tint: #e5eedf; --border: #dbe3d4;
+}
+:root[data-theme="walnut"] {
+  --ink: #3e3026; --muted: #756354; --background: #f7f3ed;
+  --surface: #fffdf9; --accent: #805637; --tint: #efe3d5; --border: #e5d9ca;
+}
+:root[data-theme="sandstone"] {
+  --ink: #453329; --muted: #7b6251; --background: #faf5ee;
+  --surface: #fffdf9; --accent: #9b4c31; --tint: #f5e5d7; --border: #e9d9ca;
+}
+:root[data-theme="slate"] {
+  --ink: #2d3348; --muted: #61687d; --background: #f4f5f9;
+  --surface: #ffffff; --accent: #535e91; --tint: #e8ebf5; --border: #dce0ec;
+}
+:root[data-theme="ocean"][data-mode="dark"] {
+  --ink: #e1edf0; --muted: #a0bac3; --background: #101e25;
+  --surface: #182b34; --accent: #83cddd; --tint: #223e49; --border: #314b57;
+}
+:root[data-theme="forest"][data-mode="dark"] {
+  --ink: #e6eddf; --muted: #afbea6; --background: #171f19;
+  --surface: #222d23; --accent: #aed095; --tint: #31402d; --border: #414e3d;
+}
+:root[data-theme="walnut"][data-mode="dark"] {
+  --ink: #f0e7dc; --muted: #c3b09c; --background: #241c18;
+  --surface: #302720; --accent: #dcb38a; --tint: #46382c; --border: #59483a;
+}
+:root[data-theme="sandstone"][data-mode="dark"] {
+  --ink: #f4e7db; --muted: #cfb3a0; --background: #281e1b;
+  --surface: #352823; --accent: #f0b18f; --tint: #4c352c; --border: #60453a;
+}
+:root[data-theme="slate"][data-mode="dark"] {
+  --ink: #e6e9f4; --muted: #b0b8d0; --background: #1a1d29;
+  --surface: #252a3b; --accent: #b4bef2; --tint: #353d57; --border: #454e6b;
+}
+:root {
+  color-scheme: light;
+  --accent-ink: #ffffff;
+  --danger: #ad3026; --danger-bg: #fff0ec;
+  --warning: #795716; --warning-bg: #fff5d9;
+  --protected: #b2731e; --habitat: #67834c;
+  --map-water: var(--tint); --map-land: var(--background); --map-grid: var(--border);
+  --popover-shadow: 0 16px 48px #18343e1c;
+}
+:root[data-mode="dark"] {
+  color-scheme: dark;
+  --accent-ink: #172129;
+  --danger: #ffb0a4; --danger-bg: #4d2927;
+  --warning: #f1cf80; --warning-bg: #413620;
+  --protected: #e4b45e; --habitat: #a0bc81;
+  --popover-shadow: 0 16px 48px #0005;
+}

@@ -52,6 +52,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
 - Responsive layout with mobile navigation.
+- Five workspace themes (Ocean, Forest, Walnut, Sandstone, Slate) with light, dark, and system modes. Appearance preferences persist on the device and sync across open tabs.
 
 The map and coastline data are bundled and work offline. The California route and habitat datasets are included planning scenarios; API accounts or live AIS/whale feeds are not required. Planning and saved records work locally and on the public Vercel deployment.
 
@@ -88,7 +89,9 @@ Interactive API documentation: http://localhost:8000/docs
 
 ## Styling
 
-Edit the variables at the top of src/style.css to change colors, typography, spacing, or corner radius throughout the app. Shared surface, button, field, and layout rules apply across all pages. The stylesheet uses shared layout rules and centralized ocean-theme tokens and two responsive breakpoints; no CSS framework or generated utility classes are required. Secondary vessel and cargo inputs remain under the expandable details section.
+Use **Appearance** in the header to choose a theme and a light, dark, or system mode. Changes apply immediately across the workspace and map without a reload or route recalculation. Preferences use browser localStorage and remain usable for the current session if storage is unavailable.
+
+Edit semantic color palettes in `src/themes.css` and shared typography, spacing, and layout rules in `src/style.css`. `src/appearance.js` restores preferences before React renders; `src/Appearance.jsx` owns the selector, device-mode updates, and cross-tab sync. No theme framework or external font requests are required. Secondary vessel and cargo inputs remain under the expandable details section.
 
 
 

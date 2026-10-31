@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { api, download } from "./api";
 import VoyageMap from "./Map";
+import Appearance from "./Appearance";
 import Intro from "./Intro";
 
 const freshInputs = () => ({
@@ -136,6 +137,7 @@ function Stat({ label, value, unit, sub, dark, icon: Icon }) {
         {value}
         <em>{unit}</em>
       </div>
+      <small className="stat-sub">{sub}</small>
     </article>
   );
 }
@@ -424,6 +426,7 @@ export default function App() {
             </b>
           </div>
           <div className="header-actions">
+            <Appearance />
             <button
               className="icon-button"
               aria-label="How Bon Voyage works"
