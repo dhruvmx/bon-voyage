@@ -151,6 +151,11 @@
   .manifest-fields .field { margin: 0; font-size: 12px; }
   .manifest-fields input { padding: 9px; font-size: 13px; }
   .manifest-total { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; font-size: 13px; }
+  .cargo-model { padding: 12px; border-top: 1px solid var(--border); }
+  .cargo-model > strong, .cargo-model > small { display: block; font-size: 11px; line-height: 1.6; margin-top: 6px; }
+  .cargo-model .field { font-size: 12px; margin-bottom: 10px; }
+  .route-priorities { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 16px 20px; background: var(--tint); font-size: 13px; }
+  .route-priorities small { flex-basis: 100%; font-size: 11px; }
   .arrival-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 5px 0 16px; }
   .cargo-arrival { margin-top: 24px; }
   .cargo-table-wrap { overflow-x: auto; }

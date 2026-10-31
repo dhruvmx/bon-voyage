@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Literal
 from .routing import PORTS, CARGOS, ZONES, plan, RoutePlanningError, DATA_COVERAGE
 from .cargo_catalog import PRODUCTS, PRODUCT_BY_ID
 from .database import connect, database_url, INTEGRITY_ERRORS
@@ -150,6 +151,7 @@ class CargoItem(BaseModel):
     temperature:float|None=Field(default=None,ge=-30,le=40)
     shelf_life:float|None=Field(default=None,gt=0,le=100000)
     cargo_age:float=Field(default=0,ge=0,le=100000)
+    routing_priority:Literal['auto','freshness','fuel','habitat']='auto'
 
     @model_validator(mode='after')
     def resolve_product(self):
