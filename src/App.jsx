@@ -1719,4 +1719,3 @@ function Insights({ voyages, onPlan }) {
 }
 
 
-
