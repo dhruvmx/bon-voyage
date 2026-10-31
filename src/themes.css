@@ -20,24 +20,24 @@
   --surface: #ffffff; --accent: #535e91; --tint: #e8ebf5; --border: #dce0ec;
 }
 :root[data-theme="ocean"][data-mode="dark"] {
-  --ink: #e1edf0; --muted: #a0bac3; --background: #101e25;
-  --surface: #182b34; --accent: #83cddd; --tint: #223e49; --border: #314b57;
+  --ink: #e4ecef; --muted: #9cafb8; --background: #0d141a;
+  --surface: #151f27; --accent: #75bfce; --tint: #20323c; --border: #2c3b45;
 }
 :root[data-theme="forest"][data-mode="dark"] {
-  --ink: #e6eddf; --muted: #afbea6; --background: #171f19;
-  --surface: #222d23; --accent: #aed095; --tint: #31402d; --border: #414e3d;
+  --ink: #e6ece4; --muted: #a6b3a1; --background: #101611;
+  --surface: #19211b; --accent: #a3c18c; --tint: #2b3828; --border: #344232;
 }
 :root[data-theme="walnut"][data-mode="dark"] {
-  --ink: #f0e7dc; --muted: #c3b09c; --background: #241c18;
-  --surface: #302720; --accent: #dcb38a; --tint: #46382c; --border: #59483a;
+  --ink: #ede7df; --muted: #b7aa9b; --background: #181410;
+  --surface: #231e19; --accent: #cba77f; --tint: #373026; --border: #453a2f;
 }
 :root[data-theme="sandstone"][data-mode="dark"] {
-  --ink: #f4e7db; --muted: #cfb3a0; --background: #281e1b;
-  --surface: #352823; --accent: #f0b18f; --tint: #4c352c; --border: #60453a;
+  --ink: #f0e7e2; --muted: #bfaaa0; --background: #1b1412;
+  --surface: #271e1b; --accent: #dda183; --tint: #3c2e28; --border: #4b3830;
 }
 :root[data-theme="slate"][data-mode="dark"] {
-  --ink: #e6e9f4; --muted: #b0b8d0; --background: #1a1d29;
-  --surface: #252a3b; --accent: #b4bef2; --tint: #353d57; --border: #454e6b;
+  --ink: #e6e9f1; --muted: #a5aec4; --background: #12151e;
+  --surface: #1b202c; --accent: #a6b1e4; --tint: #2e3549; --border: #3b4359;
 }
 :root {
   color-scheme: light;
@@ -46,13 +46,18 @@
   --warning: #795716; --warning-bg: #fff5d9;
   --protected: #b2731e; --habitat: #67834c;
   --map-water: var(--tint); --map-land: var(--background); --map-grid: var(--border);
+  --route-halo: var(--surface);
   --popover-shadow: 0 16px 48px #18343e1c;
 }
 :root[data-mode="dark"] {
   color-scheme: dark;
-  --accent-ink: #172129;
-  --danger: #ffb0a4; --danger-bg: #4d2927;
-  --warning: #f1cf80; --warning-bg: #413620;
-  --protected: #e4b45e; --habitat: #a0bc81;
-  --popover-shadow: 0 16px 48px #0005;
+  --accent-ink: #111a20;
+  --danger: #f0a397; --danger-bg: #382322;
+  --warning: #e7c57d; --warning-bg: #332c1d;
+  --protected: #dcb46b; --habitat: #9dbb83;
+  --map-water: color-mix(in srgb, var(--background), var(--surface) 25%);
+  --map-land: color-mix(in srgb, var(--surface), var(--border) 25%);
+  --map-grid: color-mix(in srgb, var(--border), var(--map-water) 45%);
+  --route-halo: var(--map-water);
+  --popover-shadow: 0 20px 64px #0008, 0 0 0 1px #ffffff05;
 }
