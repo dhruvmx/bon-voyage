@@ -257,6 +257,21 @@ export default function App() {
   }, [progress]);
   // As the sea parts, greet signed-out visitors with the login screen.
 
+  useEffect(() => {
+    if (!introRevealed || !authChecked || user || introLoginShown.current) return;
+    introLoginShown.current = true;
+    setAuthMode("login");
+    setModal("auth");
+  }, [introRevealed, authChecked, user]);
+  const route = result?.routes.find((x) => x.id === selected),
+    cargo = catalog?.cargo_types[inputs.cargo_type];
+  const change = (key, value) => setInputs((p) => ({ ...p, [key]: value }));
+  const requireAuth = () => {
+    if (user) return true;
+    setAuthMode("signup");
+    setModal("auth");
+    return false;
+  };
   const switchView = (name) => {
     setView(name);
     setPlaying(false);
