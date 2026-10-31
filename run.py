@@ -10,7 +10,7 @@ if Path(sys.prefix).resolve()!= (ROOT/'.venv').resolve():
         print('Creating isolated Python environment...',flush=True)
         venv.create(ROOT/'.venv',with_pip=True)
     raise SystemExit(subprocess.call([str(python),str(ROOT/'run.py'),*sys.argv[1:]]))
-if any(importlib.util.find_spec(package) is None for package in ('fastapi','uvicorn','psycopg')):
+if any(importlib.util.find_spec(package) is None for package in ('fastapi','uvicorn','psycopg','searoute')):
     subprocess.run([sys.executable,'-m','pip','install','-r','requirements.txt'],check=True)
 npm=shutil.which('npm.cmd' if os.name=='nt' else 'npm')
 if not npm:

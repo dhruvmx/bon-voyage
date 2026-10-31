@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -29,12 +29,15 @@ import VoyageMap from "./Map";
 import Appearance from "./Appearance";
 import Intro from "./Intro";
 import SidebarControls from "./SidebarControls";
+import CargoPicker from "./CargoPicker";
+import { cargoItems, manifestInputs, manifestError, whaleAssessed, formatHours } from "./cargo";
 
 const freshInputs = () => ({
   origin: "la",
   destination: "oakland",
   cargo_type: "avocados",
   cargo_name: "Avocados",
+  cargo_items: [{ product_id: "avocados", name: "Avocados", profile: "avocados", weight: 240, temperature: 5, shelf_life: 336, cargo_age: 0 }],
   weight: 240,
   temperature: 5,
   shelf_life: 336,
@@ -153,6 +156,8 @@ export default function App() {
     [selected, setSelected] = useState("balanced"),
     [calculating, setCalculating] = useState(false),
     [planError, setPlanError] = useState("");
+  const manifest = useMemo(() => cargoItems(inputs), [inputs]);
+  const setManifest = useCallback((items) => setInputs((previous) => manifestInputs(previous, items)), []);
   const [voyages, setVoyages] = useState([]),
     [vessels, setVessels] = useState([]),
     [vesselId, setVesselId] = useState(""),
@@ -215,6 +220,10 @@ export default function App() {
   }, [user?.id, refresh]);
   useEffect(() => {
     if (!catalog) return;
+    const cargoError = manifestError(manifest);
+    if (cargoError) {
+      ++requestNo.current; setPlanError(cargoError); setResult(null); setCalculating(false); return;
+    }
     const n = ++requestNo.current;
     setCalculating(true);
     setPlanError("");
@@ -240,7 +249,7 @@ export default function App() {
       300,
     );
     return () => clearTimeout(timer);
-  }, [inputs, catalog]);
+  }, [inputs, catalog, manifest]);
   useEffect(() => {
     setProgress(0);
     setPlaying(false);
@@ -269,17 +278,6 @@ export default function App() {
     setView(name);
     setPlaying(false);
     setQuery("");
-  };
-  const chooseCargo = (type) => {
-    const c = catalog.cargo_types[type];
-    setInputs((p) => ({
-      ...p,
-      cargo_type: type,
-      cargo_name: c.name,
-      temperature: c.temperature,
-      shelf_life: c.shelf,
-      cargo_age: 0,
-    }));
   };
   const useVessel = (id) => {
     setVesselId(id);
@@ -493,7 +491,7 @@ export default function App() {
                 className="button secondary"
                 disabled={!ready}
                 onClick={() =>
-                  download({ inputs, route, data_mode: result.data_mode })
+                  download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage })
                 }
               >
                 <Download size={15} /> Export voyage
@@ -539,10 +537,10 @@ export default function App() {
             <>
               <section className="stats">
                 <Stat
-                  label="Arrival freshness"
+                  label={manifest.length > 1 ? "Cargo freshness (avg.)" : "Arrival freshness"}
                   value={route ? route.freshness.toFixed(1) : "—"}
                   unit="%"
-                  sub={`${Number(inputs.weight).toLocaleString()} tonnes of ${inputs.cargo_name.toLowerCase()}`}
+                  sub={`${Number(inputs.weight).toLocaleString()} tonnes · ${manifest.length} cargo item${manifest.length === 1 ? "" : "s"}`}
                   icon={Leaf}
                 />
                 <Stat
@@ -570,10 +568,10 @@ export default function App() {
                   icon={BarChart3}
                 />
                 <Stat
-                  label="Whale safety"
-                  value={route ? Math.round(route.protection) : "—"}
-                  unit="/100"
-                  sub="Protected zones limited to 10 knots"
+                  label="Whale assessment"
+                  value={whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"}
+                  unit={whaleAssessed(route, inputs) ? "/100" : ""}
+                  sub={whaleAssessed(route, inputs) ? "California scenario estimate" : "Habitat coverage incomplete"}
                   dark
                   icon={ShieldCheck}
                 />
@@ -584,7 +582,8 @@ export default function App() {
                     route={route}
                     routes={result?.routes || []}
                     zones={catalog.zones}
-                    color={cargo.color}
+                    color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"}
+                    coverage={result?.data_coverage}
                     progress={progress}
                     setProgress={setProgress}
                     playing={playing}
@@ -653,70 +652,30 @@ export default function App() {
                         </select>
                       </Field>
                     </div>
-                    <div className="field-title">
-                      Cargo
-                    </div>
-                    <div className="cargo-options">
-                      {Object.entries(catalog.cargo_types).map(([id, c]) => (
-                        <button
-                          key={id}
-                          className={inputs.cargo_type === id ? "selected" : ""}
-                          aria-pressed={inputs.cargo_type === id}
-                          onClick={() => chooseCargo(id)}
-                        >
-                          <strong>{c.name}</strong>
-                          {inputs.cargo_type === id && <Check size={12} />}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="two-fields">
-                      <Field
-                        label="Cargo weight (tonnes)"
-                        type="number"
-                        min="1"
-                        max="100000"
-                        value={inputs.weight}
-                        onChange={(e) =>
-                          change("weight", Number(e.target.value))
-                        }
-                      />
-                      <Field
-                        label="Reefer temperature (°C)"
-                        type="number"
-                        min="-30"
-                        max="40"
-                        value={inputs.temperature}
-                        onChange={(e) =>
-                          change("temperature", Number(e.target.value))
-                        }
-                      />
-                    </div>
+                    <CargoPicker products={catalog.cargo_products || []} profiles={catalog.cargo_types}
+                      items={manifest} onChange={setManifest} />
                     <label className="range-label" htmlFor="arrival-window">
                       Arrival window{" "}
-                      <strong>{inputs.arrival_window} hours</strong>
+                      <strong>{formatHours(inputs.arrival_window)}</strong>
                     </label>
                     <input
                       id="arrival-window"
                       type="range"
-                      min="8"
-                      max="120"
+                      min="1"
+                      max={catalog.max_arrival_hours || 2160}
                       value={inputs.arrival_window}
                       onChange={(e) =>
                         change("arrival_window", Number(e.target.value))
                       }
                     />
+                    <div className="arrival-scale"><span>1 hour</span><span>90 days</span></div>
+                    <Field label="Arrival window (hours)" type="number" min="1" max="2160" step="1"
+                      value={inputs.arrival_window} onChange={(event) => change("arrival_window", Number(event.target.value))} />
                     <details className="advanced">
                       <summary>
                         Vessel, cargo & departure details <Plus size={13} />
                       </summary>
                       <div className="advanced-fields">
-                        <Field
-                          label="Shipment / cargo name"
-                          required
-                          maxLength="100"
-                          value={inputs.cargo_name}
-                          onChange={(e) => change("cargo_name", e.target.value)}
-                        />
                         <Field label="Assigned vessel">
                           <select
                             value={vesselId}
@@ -759,26 +718,6 @@ export default function App() {
                               setVesselId("");
                               change("fuel_per_day", Number(e.target.value));
                             }}
-                          />
-                          <Field
-                            label="Initial shelf life (hours)"
-                            type="number"
-                            min="1"
-                            max="100000"
-                            value={inputs.shelf_life}
-                            onChange={(e) =>
-                              change("shelf_life", Number(e.target.value))
-                            }
-                          />
-                          <Field
-                            label="Cargo age (hours)"
-                            type="number"
-                            min="0"
-                            max="100000"
-                            value={inputs.cargo_age}
-                            onChange={(e) =>
-                              change("cargo_age", Number(e.target.value))
-                            }
                           />
                         </div>
                         <Field label="Departure (your local time)">
@@ -831,11 +770,9 @@ export default function App() {
                       </div>
                     )}
                     {route &&
-                      route.freshness < 70 &&
-                      inputs.cargo_type !== "electronics" && (
+                      (route.worst_cargo_freshness ?? route.freshness) < 70 && (
                         <div className="warning">
-                          Freshness is low. Review cargo age, temperature, or
-                          departure requirements.
+                          One or more cargo items have low freshness. Review the item-level results, handling values, or arrival window.
                         </div>
                       )}
                     <button
@@ -846,7 +783,7 @@ export default function App() {
                           setDataError("");
                           if (!voyageName)
                             setVoyageName(
-                              `${inputs.cargo_name} · ${catalog.ports.find((p) => p.id === inputs.destination).name}`,
+                              `${manifest.length > 1 ? `${manifest.length} cargo items` : inputs.cargo_name} · ${catalog.ports.find((p) => p.id === inputs.destination).name}`.slice(0, 120),
                             );
                           setModal("save");
                         }
@@ -862,6 +799,13 @@ export default function App() {
                   </div>
                 </section>
               </div>
+              {route?.cargo_results && <section className="panel cargo-arrival">
+                <div className="panel-heading"><div><h2>Cargo on arrival</h2><p>Item-level estimates for the selected passage. The headline freshness is weighted by cargo mass.</p></div></div>
+                <div className="cargo-table-wrap"><table><caption className="sr-only">Cargo freshness and remaining shelf life</caption>
+                  <thead><tr><th scope="col">Cargo</th><th scope="col">Weight</th><th scope="col">Freshness</th><th scope="col">Shelf life left</th></tr></thead>
+                  <tbody>{route.cargo_results.map((item, index) => <tr key={index}><th scope="row">{item.name}</th><td>{item.weight.toLocaleString()} t</td><td className={item.freshness < 70 ? "cargo-at-risk" : ""}>{item.freshness.toFixed(1)}%</td><td>{item.profile === "electronics" ? "Non-perishable" : formatHours(Math.floor(item.shelf_remaining))}</td></tr>)}</tbody>
+                </table></div>
+              </section>}
               <section className="routes-section">
                 <div className="section-heading">
                   <div>
@@ -871,7 +815,7 @@ export default function App() {
                     </p>
                   </div>
                   <span className="stamp">
-                    {calculating ? "Recalculating…" : "3 calculated routes"}
+                    {calculating ? "Recalculating…" : `3 passage options · ${result?.distinct_paths || 0} distinct paths`}
                   </span>
                 </div>
                 <div className="route-cards">
@@ -904,10 +848,10 @@ export default function App() {
                         </div>
                         <div>
                           <strong>
-                            {Math.round(r.protection)}
-                            <em>/100</em>
+                            {whaleAssessed(r, inputs) ? Math.round(r.protection) : "N/A"}
+                            {whaleAssessed(r, inputs) && <em>/100</em>}
                           </strong>
-                          <small>Whale safety</small>
+                          <small>Whale assessment</small>
                         </div>
                       </div>
                       <div className="route-bottom">
@@ -924,7 +868,7 @@ export default function App() {
               {route && (
                 <section className="panel speed-panel">
                   <div className="speed-segments">
-                    <div><strong>{Math.min(10, inputs.max_speed)} kn</strong><small>Protected waters</small></div>
+                    <div><strong>{Math.min(10, inputs.max_speed)} kn</strong><small>Modeled slow zones only</small></div>
                     <div><strong>{route.speed.toFixed(1)} kn</strong><small>Open-water speed</small></div>
                     <div><strong>{route.shelf_remaining.toFixed(0)} h</strong><small>Shelf life on arrival</small></div>
                   </div>
@@ -1001,7 +945,7 @@ export default function App() {
                 <div className="saved-list">
                   {voyages
                     .filter((v) =>
-                      (v.name + " " + v.inputs.cargo_name)
+                      (v.name + " " + v.inputs.cargo_name + " " + (v.inputs.cargo_items || []).map((item) => item.name).join(" "))
                         .toLowerCase()
                         .includes(query.toLowerCase()),
                     )
@@ -1154,7 +1098,7 @@ export default function App() {
           ) : (
             <Insights voyages={voyages} onPlan={newVoyage} />
           )}
-          <footer><span>Bon Voyage</span><span>California coastal planning</span></footer>
+          <footer><span>Bon Voyage</span><span>Maritime planning scenario · habitat coverage varies</span></footer>
         </div>
       </main>
       {introState === "playing" && (
@@ -1183,15 +1127,12 @@ export default function App() {
         >
           <p>
             Choose ports and cargo, then adjust arrival time, temperature, and
-            vessel specifications. The Python planner compares three coastal
-            passages.
+            vessel specifications. Choose up to ten catalogue or custom cargo items. The Python planner compares three passage options across California corridors or global sea lanes.
           </p>
           <div className="info-box">
             <h3>What changes the route?</h3>
             <p>
-              Berries prioritize freshness, avocados balance the tradeoffs, and
-              grain or electronics favor fuel efficiency and habitat avoidance.
-              Every protected segment remains at or below 10 knots.
+              Each item has a perishability model, weight, and handling values. The planner considers the most time-sensitive item as well as fuel use. Modeled California slow zones stay at or below 10 knots; worldwide habitat coverage is incomplete.
             </p>
           </div>
           <p>
@@ -1219,7 +1160,7 @@ export default function App() {
                 {route?.freshness.toFixed(1)}% <small>Freshness</small>
               </strong>
               <strong>
-                {Math.round(route?.protection)} <small>Whale safety</small>
+                {whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"} <small>Whale assessment</small>
               </strong>
             </div>
             <Field
@@ -1650,11 +1591,12 @@ function Profile({ user, setUser, notify, onLogout }) {
   );
 }
 function Insights({ voyages, onPlan }) {
+  const assessed = voyages.filter((voyage) => whaleAssessed(voyage.result, voyage.inputs));
   const total = voyages.reduce((s, v) => s + v.inputs.weight, 0),
     fuel = voyages.reduce((s, v) => s + v.result.fuel, 0),
-    protection = voyages.length
-      ? voyages.reduce((s, v) => s + v.result.protection, 0) / voyages.length
-      : 0;
+    protection = assessed.length
+      ? assessed.reduce((sum, voyage) => sum + voyage.result.protection, 0) / assessed.length
+      : null;
   return (
     <>
       <section className="stats">
@@ -1679,10 +1621,10 @@ function Insights({ voyages, onPlan }) {
           icon={Leaf}
         />
         <Stat
-          label="Whale safety"
-          value={Math.round(protection)}
-          unit="/100"
-          sub="Average of your saved passages"
+          label="Whale assessment"
+          value={protection === null ? "N/A" : Math.round(protection)}
+          unit={protection === null ? "" : "/100"}
+          sub={`${assessed.length} of ${voyages.length} voyages have California scenario estimates`}
           dark
           icon={ShieldCheck}
         />
@@ -1724,8 +1666,7 @@ function Insights({ voyages, onPlan }) {
           Fuel is calculated segment by segment from your vessel’s consumption
           at 18 knots, using a cubic speed model. Freshness responds to elapsed
           time, cargo age, temperature, and the shelf-life window. Whale
-          protection reflects distance and speed within the scenario’s habitat
-          zones.
+          assessment reflects only the bundled California scenario zones. Unassessed international voyages are excluded from the average; missing habitat data does not mean a passage is safe. Mixed cargo freshness is weighted by mass; recommendations also consider the most time-sensitive item.
         </p>
       </div>
     </>

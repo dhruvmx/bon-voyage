@@ -1,4 +1,6 @@
 import os, tempfile, unittest
+from unittest.mock import patch
+from backend import routing
 from pathlib import Path
 from fastapi.testclient import TestClient
 from backend import main
@@ -84,6 +86,105 @@ class BonVoyageTests(unittest.TestCase):
         new=TestClient(main.app)
         self.assertEqual(new.post('/api/auth/login',json={'email':'alex@example.com','password':'test-password-123'}).status_code,200)
         self.assertEqual(len(new.get('/api/voyages').json()),1);new.close()
+
+    def test_catalog_products_and_global_coverage(self):
+        catalog=self.a.get('/api/catalog').json()
+        products=catalog['cargo_products']
+        self.assertGreaterEqual(len(products),200); self.assertLessEqual(len(products),300)
+        self.assertEqual(len({product['id'] for product in products}),len(products))
+        self.assertEqual(catalog['max_cargo_items'],10)
+        self.assertEqual(catalog['max_arrival_hours'],2160)
+        self.assertFalse(catalog['data_coverage']['whale']['live'])
+
+    def test_international_route_and_long_arrival_window(self):
+        response=self.a.post('/api/plan',json={**self.inputs,'origin':'shanghai','destination':'singapore','arrival_window':2160})
+        self.assertEqual(response.status_code,200,response.text)
+        result=response.json()
+        self.assertFalse(result['data_coverage']['whale']['score_available'])
+        self.assertEqual(len(result['routes']),3)
+        for route in result['routes']:
+            self.assertIsNone(route['protection']); self.assertFalse(route['whale_assessed'])
+            self.assertTrue(route['feasible']); self.assertGreater(route['hours'],100)
+            self.assertEqual(route['coordinates'][0],[31.35,121.6])
+            self.assertAlmostEqual(route['coordinates'][-1][0],1.26,places=3)
+            self.assertTrue(all(abs(a[1]-b[1])<=180 for a,b in zip(route['coordinates'],route['coordinates'][1:])))
+
+    def test_pacific_dateline_route(self):
+        response=self.a.post('/api/plan',json={**self.inputs,'origin':'la','destination':'shanghai','arrival_window':1080})
+        self.assertEqual(response.status_code,200,response.text)
+        route=response.json()['routes'][0]
+        self.assertGreater(route['distance'],4000); self.assertLess(route['distance'],9000)
+        self.assertTrue(all(abs(a[1]-b[1])<=180 for a,b in zip(route['coordinates'],route['coordinates'][1:])))
+
+    def test_global_dependency_and_no_path_errors_are_readable(self):
+        payload={**self.inputs,'origin':'shanghai','destination':'singapore'}
+        with patch.object(routing,'_searoute',None):
+            response=self.a.post('/api/plan',json=payload)
+            self.assertEqual(response.status_code,503)
+            self.assertIn('requirements',response.json()['detail'])
+            self.assertEqual(self.a.post('/api/plan',json=self.inputs).status_code,200)
+        with patch.object(routing,'_cached_world_paths',side_effect=routing.RoutePlanningError('No sea passage could be calculated.')):
+            response=self.a.post('/api/plan',json=payload)
+            self.assertEqual(response.status_code,422)
+            self.assertIn('sea passage',response.json()['detail'])
+
+    def test_mixed_cargo_results_and_temperature(self):
+        manifest=[{'product_id':'strawberries','weight':5},
+                  {'product_id':None,'name':'Custom sensors','profile':'electronics','weight':95}]
+        cold=self.a.post('/api/plan',json={**self.inputs,'cargo_items':manifest}).json()['routes'][0]
+        self.assertEqual(len(cold['cargo_results']),2)
+        berries,sensors=cold['cargo_results']
+        self.assertEqual(sensors['freshness'],100)
+        self.assertLess(berries['freshness'],100)
+        self.assertAlmostEqual(cold['freshness'],berries['freshness']*.05+95,places=2)
+        warm=self.a.post('/api/plan',json={**self.inputs,'cargo_items':[{**manifest[0],'temperature':20},manifest[1]]}).json()['routes'][0]
+        self.assertLess(warm['cargo_results'][0]['freshness'],berries['freshness'])
+        self.assertLess(warm['worst_cargo_freshness'],warm['freshness'])
+
+    def test_manifest_limits_and_identity_validation(self):
+        items=[{'name':f'Custom cargo {i}','profile':'electronics','weight':1} for i in range(10)]
+        self.assertEqual(self.a.post('/api/plan',json={**self.inputs,'cargo_items':items}).status_code,200)
+        for bad in [[],items+[{'name':'Eleventh cargo'}],[items[0],items[0]],[{'product_id':'unknown'}],[{'name':'   '}],[{'name':'Invalid','weight':0}],[{'name':'Invalid','profile':'unknown'}]]:
+            self.assertEqual(self.a.post('/api/plan',json={**self.inputs,'cargo_items':bad}).status_code,422)
+        response=self.a.post('/api/plan',json={**self.inputs,'cargo_items':[{'product_id':'avocados','name':'Spoofed name','profile':'electronics'}]}).json()
+        item=response['routes'][0]['cargo_results'][0]
+        self.assertEqual(item['name'],'Avocados'); self.assertEqual(item['profile'],'avocados')
+
+    def test_manifest_persistence_and_capacity_uses_total_weight(self):
+        self.signup(self.a)
+        vessel=self.a.post('/api/vessels',json={'name':'Manifest carrier','capacity':100}).json()
+        items=[{'product_id':'avocados','weight':60},{'name':'Custom tools','profile':'electronics','weight':60}]
+        payload=self.voyage(vessel_id=vessel['id'])
+        payload['inputs']={**self.inputs,'weight':1,'cargo_items':items}
+        self.assertEqual(self.a.post('/api/voyages',json=payload).status_code,422)
+        items[0]['weight']=30; items[1]['weight']=20
+        saved=self.a.post('/api/voyages',json=payload)
+        self.assertEqual(saved.status_code,201,saved.text)
+        record=self.a.get('/api/voyages').json()[0]
+        self.assertEqual(record['inputs']['weight'],50)
+        self.assertEqual(record['inputs']['cargo_items'][1]['name'],'Custom tools')
+        self.assertEqual(len(record['result']['cargo_results']),2)
+        self.assertTrue(record['data_coverage']['whale']['score_available'])
+
+    def test_product_temperature_reference_and_arrival_bounds(self):
+        payload={**self.inputs,'cargo_items':[{'product_id':'frozen-beef','weight':1}]}
+        cold=self.a.post('/api/plan',json=payload).json()['routes'][0]
+        self.assertAlmostEqual(cold['shelf_remaining'],4320-cold['hours'],places=1)
+        payload['cargo_items'][0]['temperature']=-8
+        warm=self.a.post('/api/plan',json=payload).json()['routes'][0]
+        self.assertAlmostEqual(warm['shelf_remaining'],2160-warm['hours'],places=1)
+        for window in [0,2161]:
+            self.assertEqual(self.a.post('/api/plan',json={**self.inputs,'arrival_window':window}).status_code,422)
+
+    def test_global_geometry_cache_avoids_recomputing_for_cargo_edits(self):
+        routing._cached_world_paths.cache_clear()
+        payload={**self.inputs,'origin':'shanghai','destination':'singapore'}
+        with patch.object(routing._searoute,'searoute',wraps=routing._searoute.searoute) as network:
+            first=self.a.post('/api/plan',json=payload).json()
+            calls=network.call_count
+            second=self.a.post('/api/plan',json={**payload,'temperature':12}).json()
+            self.assertGreater(calls,0); self.assertEqual(network.call_count,calls)
+            self.assertEqual(first['routes'][0]['coordinates'],second['routes'][0]['coordinates'])
 
 if __name__=='__main__':unittest.main()
 

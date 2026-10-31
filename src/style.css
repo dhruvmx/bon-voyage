@@ -116,6 +116,54 @@
   .cargo-options strong { display: block; font-weight: 500; font-size: 14px; padding-right: 13px; }
   .cargo-options button.selected, .route-card.selected { border-color: var(--accent); background: var(--tint); }
   .cargo-options svg { position: absolute; right: 8px; top: 8px; color: var(--accent); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  .cargo-picker { margin-bottom: 24px; }
+  .cargo-heading { margin-bottom: 12px; font-size: 15px; font-weight: 600; }
+  .cargo-heading small { font-weight: 400; font-size: 12px; white-space: nowrap; }
+  .cargo-search-wrap { position: relative; }
+  .cargo-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 10px; background: var(--surface); }
+  .cargo-search:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cargo-search > svg { color: var(--muted); }
+  .cargo-search input { border: 0; outline: none; background: transparent; padding: 12px 0; width: 100%; min-width: 0; font-size: 13px; }
+  .cargo-search input::placeholder { color: var(--muted); opacity: 1; }
+  .cargo-dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 700; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--popover-shadow); overflow: hidden; }
+  .cargo-dropdown ul { list-style: none; margin: 0; padding: 4px; max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
+  .cargo-dropdown li { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-radius: 8px; padding: 10px; font-size: 13px; cursor: pointer; }
+  .cargo-dropdown li b { display: block; font-weight: 500; }
+  .cargo-dropdown li small { display: block; font-size: 11px; margin-top: 2px; }
+  .cargo-dropdown li:hover, .cargo-dropdown li[data-active="true"] { background: var(--tint); }
+  .cargo-dropdown li[aria-selected="true"] { color: var(--muted); cursor: default; }
+  .cargo-hint { display: block; margin-top: 8px; font-size: 11px; line-height: 1.6; }
+  .custom-cargo-action { display: flex; align-items: center; gap: 6px; font-size: 12px; text-align: left; overflow-wrap: anywhere; max-width: 100%; }
+  .custom-cargo-form { margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--tint); min-width: 0; }
+  .custom-cargo-form legend { font-size: 13px; font-weight: 600; }
+  .custom-cargo-form .saved-actions { border: 0; padding: 0; margin: 0; gap: 10px; }
+  .manifest-items { margin-top: 12px; max-height: 480px; overflow-y: auto; scrollbar-gutter: stable; }
+  .manifest-item { position: relative; border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+  .manifest-item summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 44px 12px 12px; min-height: 65px; cursor: pointer; }
+  .manifest-item summary::-webkit-details-marker { display: none; }
+  .manifest-item summary b { display: block; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+  .manifest-item summary small { display: block; font-size: 11px; margin-top: 4px; }
+  .manifest-item details[open] summary > svg { transform: rotate(180deg); }
+  .manifest-remove { position: absolute; right: 5px; top: 14px; width: 32px; height: 32px; display: grid; place-items: center; color: var(--muted); }
+  .manifest-remove:hover { color: var(--danger); }
+  .manifest-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; border-top: 1px solid var(--border); }
+  .manifest-fields .field { margin: 0; font-size: 12px; }
+  .manifest-fields input { padding: 9px; font-size: 13px; }
+  .manifest-total { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; font-size: 13px; }
+  .arrival-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 5px 0 16px; }
+  .cargo-arrival { margin-top: 24px; }
+  .cargo-table-wrap { overflow-x: auto; }
+  .cargo-arrival table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 13px; text-align: left; }
+  .cargo-arrival th, .cargo-arrival td { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+  .cargo-arrival thead th { font-weight: 500; color: var(--muted); }
+  .cargo-arrival tbody th { font-weight: 500; }
+  .cargo-arrival tr:last-child > * { border-bottom: 0; }
+  .cargo-at-risk { color: var(--danger); font-weight: 600; }
+  .coverage-note { border-top: 1px solid var(--border); padding: 16px 24px; background: var(--tint); font-size: 12px; }
+  .coverage-note strong { font-weight: 600; }
+  .coverage-note p { font-size: 12px; }
+  .coverage-note a { display: inline-block; margin-top: 8px; }
   .range-label { display: flex; justify-content: space-between; font-size: 14px; margin: 8px 0; }
   .range-label strong { font-weight: 500; }
   .advanced { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 24px; }

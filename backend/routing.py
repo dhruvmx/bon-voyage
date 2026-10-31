@@ -4,6 +4,10 @@ California port pairs keep the original hand-built corridor. Any other pair is
 routed over the global shipping-lane network provided by the `searoute` package.
 """
 import math
+from functools import lru_cache
+from threading import Lock
+from types import SimpleNamespace
+from .cargo_catalog import PRODUCT_BY_ID
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -59,6 +63,24 @@ CARGOS = {
 PASSAGES = [("direct","Freshness first",18.5),("balanced","Balanced passage",16),("eco","Ocean first",13.5)]
 # Canal / strait restrictions tried to get genuinely different world passages
 RESTRICTION_SETS = [[], ["suez"], ["panama"], ["malacca"]]
+# searoute mutates restrictions on its shared in-memory graph.
+_NETWORK_LOCK = Lock()
+DATA_COVERAGE = {
+    "whale": {
+        "scope": "California scenario only",
+        "source": "Bundled illustrative California habitat and approach zones",
+        "live": False,
+        "global_reference": "https://www.marinemammalhabitat.org/imma-eatlas/",
+        "note": "Areas without habitat data are unassessed, not whale-free. The 10-knot zones are planning assumptions, not a global regulatory database.",
+    },
+    "routing": {"source": "searoute 1.6.0 maritime network", "navigation_ready": False},
+}
+
+class RoutePlanningError(Exception):
+    def __init__(self, message, status_code=422):
+        super().__init__(message)
+        self.status_code=status_code
+
 
 
 def distance(a,b):
@@ -105,22 +127,52 @@ def california_paths(origin,dest):
 
 def world_paths(origin,dest):
     if _searoute is None:
-        raise RuntimeError("Routes outside California need the 'searoute' package: pip install searoute")
+        raise RoutePlanningError("Global routing is unavailable. Install the project's Python requirements and restart the server.",503)
+    with _NETWORK_LOCK:
+        return _cached_world_paths(origin['id'],dest['id'])
+
+@lru_cache(maxsize=128)
+def _cached_world_paths(origin_id,dest_id):
+    ports={port['id']:port for port in PORTS}
+    origin,dest=ports[origin_id],ports[dest_id]
     found=[]
     for restrictions in RESTRICTION_SETS:
         try:
-            feature=_searoute.searoute([origin['lon'],origin['lat']],[dest['lon'],dest['lat']],units='naut',restrictions=restrictions) if restrictions else _searoute.searoute([origin['lon'],origin['lat']],[dest['lon'],dest['lat']],units='naut')
+            feature=_searoute.searoute(
+                [origin['lon'],origin['lat']],[dest['lon'],dest['lat']],
+                units='naut',restrictions=['northwest',*restrictions],append_orig_dest=True)
+            geometry=feature['geometry']['coordinates']
+            if len(geometry)<2 or not math.isfinite(feature['properties']['length']): continue
+            pts=unwrap([[lat,lon] for lon,lat in geometry])
+            length=path_length(pts)
+            if length<=0: continue
+            if all(abs(length-other[0])>1 for other in found): found.append((length,pts))
         except Exception:
-            continue  # unsupported restriction name or no path with that restriction
-        pts=unwrap([[lat,lon] for lon,lat in feature['geometry']['coordinates']])
-        length=path_length(pts)
-        if all(abs(length-other[0])>1 for other in found): found.append((length,pts))
-    if not found: raise ValueError('No sea route found between these ports.')
+            continue
+    if not found: raise RoutePlanningError('No sea passage could be calculated between these ports. Try a different port pair.')
     found.sort(key=lambda x:x[0])
     chosen=[pts for _,pts in found[:3]]
-    while len(chosen)<3: chosen.append(chosen[0])  # same geometry, different speed profile
+    while len(chosen)<3: chosen.append(chosen[0])
     step=max(2.0,min(12.0,max(path_length(c) for c in chosen)/800))
     return {rid:dense(pts,step,4) for (rid,_,_),pts in zip(PASSAGES,chosen)}
+
+def cargo_outcomes(p,hours):
+    items=p.cargo_items if getattr(p,'cargo_items',None) else [SimpleNamespace(
+        product_id=None,name=p.cargo_name,profile=p.cargo_type,weight=p.weight,
+        temperature=p.temperature,shelf_life=p.shelf_life,cargo_age=p.cargo_age)]
+    outcomes=[]
+    for item in items:
+        model=CARGOS[item.profile]
+        product=PRODUCT_BY_ID.get(item.product_id,{})
+        reference_temperature=product.get('temperature',model['temperature'])
+        thermal=2**((item.temperature-reference_temperature)/10)
+        remaining=max(0,item.shelf_life/thermal-item.cargo_age-hours)
+        freshness=100 if model['decay']==0 else max(0,min(100,
+            100-(item.cargo_age+hours)*model['decay']*thermal,
+            100*remaining/max(1,item.shelf_life/thermal)))
+        outcomes.append(dict(product_id=item.product_id,name=item.name,profile=item.profile,
+            weight=item.weight,freshness=round(freshness,2),shelf_remaining=round(remaining,1)))
+    return outcomes
 
 def plan(p):
     ports={x['id']:x for x in PORTS}; origin=ports[p.origin]; dest=ports[p.destination]
@@ -137,10 +189,10 @@ def plan(p):
         required=open_nm/max(.01,p.arrival_window-zone_hours)
         speed=min(max_speed,max(min(cruise,max_speed),required))
         hours=zone_hours+open_nm/speed
-        cargo=CARGOS[p.cargo_type]; thermal=2**((p.temperature-cargo['temperature'])/10)
-        remaining=max(0,p.shelf_life/thermal-p.cargo_age-hours)
-        if p.cargo_type=='electronics': freshness=100
-        else: freshness=max(0,min(100,100-(p.cargo_age+hours)*cargo['decay']*thermal,100*remaining/max(1,p.shelf_life/thermal)))
+        outcomes=cargo_outcomes(p,hours)
+        total_weight=sum(item['weight'] for item in outcomes)
+        freshness=sum(item['freshness']*item['weight'] for item in outcomes)/total_weight
+        remaining=min(item['shelf_remaining'] for item in outcomes)
         # Vessel fuel/day is the reference at 18 knots; power follows speed cubed.
         fuel=0; exposure=0
         for s in segments:
@@ -150,10 +202,18 @@ def plan(p):
         protection=max(0,100-exposure/max(1,total)*100*p.whale_activity)
         eta=(datetime.fromisoformat(p.departure.replace('Z','+00:00'))+timedelta(hours=hours)).astimezone(timezone.utc).isoformat()
         feasible=hours<=p.arrival_window+.001
-        w=cargo['weights']; score=w[0]*((100-freshness)+max(0,hours-p.arrival_window)*3)+w[1]*(fuel/20)+w[2]*(100-protection)/10
-        rows.append(dict(id=route_id,name=name,distance=round(total,1),protected_distance=round(protected,1),open_distance=round(open_nm,1),speed=round(speed,2),hours=round(hours,2),freshness=round(freshness,2),fuel=round(fuel,2),co2=round(fuel*3.114,2),protection=round(protection,1),eta=eta,feasible=feasible,shelf_remaining=round(remaining,1),score=score,coordinates=coords,segments=segments))
+        # Keep the most time-sensitive item visible even in a mostly dry manifest.
+        urgency=max(CARGOS[item['profile']]['weights'][0]*((100-item['freshness'])+max(0,hours-p.arrival_window)*3) for item in outcomes)
+        fuel_weight=sum(CARGOS[item['profile']]['weights'][1]*item['weight'] for item in outcomes)/total_weight
+        habitat_weight=sum(CARGOS[item['profile']]['weights'][2]*item['weight'] for item in outcomes)/total_weight
+        score=urgency+fuel_weight*(fuel/20)+(habitat_weight*(100-protection)/10 if california else 0)
+        rows.append(dict(id=route_id,name=name,distance=round(total,1),protected_distance=round(protected,1),open_distance=round(open_nm,1),speed=round(speed,2),hours=round(hours,2),freshness=round(freshness,2),fuel=round(fuel,2),co2=round(fuel*3.114,2),protection=round(protection,1) if california else None,whale_assessed=california,cargo_results=outcomes,worst_cargo_freshness=min(item['freshness'] for item in outcomes),eta=eta,feasible=feasible,shelf_remaining=round(remaining,1),score=score,coordinates=coords,segments=segments))
     baseline=rows[0]['distance']/18*p.fuel_per_day/24
     for r in rows: r['fuel_delta']=round((r['fuel']/max(.01,baseline)-1)*100,1)
     best=min(rows,key=lambda r:(not r['feasible'],r['score']))
     mode='California coastal planning scenario' if california else 'Global sea-lane planning (searoute network)'
-    return {'routes':rows,'recommended':best['id'],'zones':ZONES,'data_mode':mode}
+    coverage={**DATA_COVERAGE,'whale':{**DATA_COVERAGE['whale'],'score_available':california,
+        'status':'scenario' if california else 'unassessed',
+        'summary':'California scenario estimate; not a live safety or compliance assessment.' if california else 'Whale habitat coverage is incomplete for this passage. No global safety score is available.'}}
+    distinct=len({tuple(map(tuple,coords)) for coords in paths.values()})
+    return {'routes':rows,'recommended':best['id'],'zones':ZONES,'data_mode':mode,'data_coverage':coverage,'distinct_paths':distinct}
