@@ -292,6 +292,20 @@ export default function App() {
         fuel_per_day: v.fuel_per_day,
       }));
   };
+  // Keep assigned-vessel calculations consistent when fleet specifications
+  // change, including when an older voyage is reopened.
+  useEffect(() => {
+    if (!vesselId) return;
+    const vessel = vessels.find((v) => v.id === vesselId);
+    if (!vessel) { setVesselId(""); return; }
+    setInputs((previous) => {
+      const minimum = vessel.min_speed ?? Math.min(8, vessel.max_speed);
+      const maximum = Math.min(vessel.max_speed, Math.max(previous.max_speed, minimum));
+      const cruiseMinimum = Math.min(maximum, Math.max(previous.min_speed ?? Math.min(8, maximum), minimum));
+      if (previous.max_speed === maximum && previous.min_speed === cruiseMinimum && previous.fuel_per_day === vessel.fuel_per_day) return previous;
+      return { ...previous, max_speed: maximum, min_speed: cruiseMinimum, fuel_per_day: vessel.fuel_per_day };
+    });
+  }, [vessels, vesselId, inputs.max_speed, inputs.min_speed, inputs.fuel_per_day]);
   const loadVoyage = (v) => {
     desiredRoute.current = v.route_id;
     setInputs(v.inputs);
@@ -318,7 +332,7 @@ export default function App() {
     setSaving(true);
     setDataError("");
     try {
-      await api("/voyages" + (editingId ? "/" + editingId : ""), {
+      const saved = await api("/voyages" + (editingId ? "/" + editingId : ""), {
         method: editingId ? "PUT" : "POST",
         body: {
           name: voyageName,
@@ -329,6 +343,7 @@ export default function App() {
           inputs,
         },
       });
+      setEditingId(saved.id);
       await refresh();
       setModal(null);
       notify(editingId ? "Voyage updated." : "Voyage saved to your account.");
@@ -853,7 +868,7 @@ export default function App() {
                           {selected === r.id && <span />}
                         </span>
                       </div>
-                      <small className="route-path">{r.path_name} · {r.speed.toFixed(2)} kn open water</small>
+                      <small className="route-path">{r.path_name} · {r.speed.toFixed(2)} kn open water{r.protected_distance > 0 ? ` · ${r.protected_speed.toFixed(2)} kn protected` : ""}</small>
                       <div className="route-metrics">
                         <div>
                           <strong>
@@ -890,7 +905,7 @@ export default function App() {
               {route && (
                 <section className="panel speed-panel">
                   <div className="speed-segments">
-                    <div><strong>{Math.min(10, inputs.max_speed)} kn</strong><small>Modeled slow zones only</small></div>
+                    <div><strong>{route.protected_distance > 0 ? `${route.protected_speed.toFixed(2)} kn` : "N/A"}</strong><small>Modeled slow zones only</small></div>
                     <div><strong>{route.speed.toFixed(2)} kn</strong><small>Open-water speed</small></div>
                     <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Earliest quality horizon on arrival"}</small></div>
                   </div>

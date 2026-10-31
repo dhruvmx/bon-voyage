@@ -51,7 +51,7 @@ class BonVoyageTests(unittest.TestCase):
         vessel=self.a.post('/api/vessels',json={'name':'Pacific Voyager','max_speed':20,'capacity':100,'fuel_per_day':30}).json()
         vid=vessel['id'];self.assertEqual(self.b.put('/api/vessels/'+vid,json={'name':'Stolen Vessel'}).status_code,404)
         self.assertEqual(self.a.post('/api/voyages',json=self.voyage(vessel_id=vid)).status_code,422)
-        self.inputs.update(weight=90,max_speed=20)
+        self.inputs.update(weight=90,max_speed=20,fuel_per_day=30)
         self.assertEqual(self.a.post('/api/voyages',json=self.voyage(vessel_id=vid)).status_code,201)
         self.assertEqual(self.a.delete('/api/vessels/'+vid).status_code,200)
         self.assertEqual(len(self.a.get('/api/voyages').json()),1)

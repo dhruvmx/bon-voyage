@@ -197,7 +197,7 @@ export default function VoyageMap({
           })
             .bindTooltip(
               `${z.name}${
-                z.kind === "vsr" ? " · 10 kn maximum" : " · Whale habitat / 10 kn"
+                z.kind === "vsr" ? " · 10 kn maximum" : " · Whale habitat / ≤10 kn"
               }`
             )
             .addTo(group)
@@ -372,7 +372,7 @@ export default function VoyageMap({
           <i style={{ background: "var(--route-color)" }} /> Open water
         </span>
         <span>
-          <i style={{ background: "var(--protected)" }} /> 10 kn protected
+          <i style={{ background: "var(--protected)" }} /> ≤10 kn protected
           transit (scenario)
         </span>
         <span>

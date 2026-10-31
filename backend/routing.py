@@ -211,7 +211,7 @@ def materialize_route(candidate,mode,p,california,reference_fuel):
     return {
         'id':mode,'name':names[mode],'path_id':path['id'],'path_name':path['name'],
         'distance':round(path['distance'],2),'protected_distance':round(path['protected_distance'],2),
-        'open_distance':round(path['open_distance'],2),'speed':speed,'hours':round(hours,4),
+        'open_distance':round(path['open_distance'],2),'speed':speed,'protected_speed':candidate['zone_speed'],'hours':round(hours,4),
         'freshness':round(sum(item['freshness']*item['weight'] for item in outcomes)/total_weight,2),
         'fuel':round(candidate['fuel'],4),'co2':round(candidate['fuel']*3.114,4),
         'fuel_delta':round((candidate['fuel']/reference_fuel-1)*100,1),
@@ -239,7 +239,7 @@ def plan(p):
           for mode in ['balanced','direct','eco']]
     for index,row in enumerate(rows):
         row['same_as']=next((prior['id'] for prior in rows[:index]
-            if (prior['path_id'],prior['speed'])==(row['path_id'],row['speed'])),None)
+            if (prior['path_id'],prior['speed'],prior['protected_speed'])==(row['path_id'],row['speed'],row['protected_speed'])),None)
     departure=datetime.fromisoformat(p.departure.replace('Z','+00:00'))
     coverage={**DATA_COVERAGE,'whale':{**DATA_COVERAGE['whale'],'score_available':california,
         'status':'scenario' if california else 'unassessed',
