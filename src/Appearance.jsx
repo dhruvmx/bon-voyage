@@ -10,7 +10,7 @@ export default memo(function Appearance() {
   const panel = useRef(null);
 
   useEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const media = window.matchMedia("(prefers-color-scheme: light)");
     const updateSystem = () => {
       if (preference.mode === "system") applyAppearance(preference);
     };
