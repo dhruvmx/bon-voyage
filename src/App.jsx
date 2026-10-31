@@ -15,7 +15,6 @@ import {
   Ship,
   Trash2,
   User,
-  Waves,
   X,
   Anchor,
   Pencil,
@@ -457,7 +456,7 @@ export default function App() {
           aria-label="Bon Voyage home"
           onClick={() => switchView("planner")}
         >
-          <Waves size={31} />
+          <i className="brand-logo" aria-hidden="true" />
           <span>Bon Voyage</span>
         </button>
         <SidebarControls />
