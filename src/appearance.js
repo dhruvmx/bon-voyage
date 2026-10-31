@@ -15,7 +15,7 @@ export function readAppearance() {
   } catch { /* Storage may be unavailable or contain older data. */ }
   return {
     theme: themes.some((theme) => theme.id === saved?.theme) ? saved.theme : "ocean",
-    mode: modes.includes(saved?.mode) ? saved.mode : "system",
+    mode: modes.includes(saved?.mode) ? saved.mode : "light",
   };
 }
 
