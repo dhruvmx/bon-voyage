@@ -27,6 +27,7 @@ import {
 import { api, download } from "./api";
 import VoyageMap from "./Map";
 import Appearance from "./Appearance";
+import Intro from "./Intro";
 
 const freshInputs = () => ({
   origin: "la",
@@ -166,6 +167,9 @@ export default function App() {
     [progress, setProgress] = useState(0),
     [playing, setPlaying] = useState(false),
     [query, setQuery] = useState("");
+  const [introState, setIntroState] = useState("playing"),
+    [introRevealed, setIntroRevealed] = useState(false),
+    introLoginShown = useRef(false);
   const closeModal = useCallback(() => setModal(null), []),
     requestNo = useRef(0),
     desiredRoute = useRef(null),
@@ -251,6 +255,13 @@ export default function App() {
   useEffect(() => {
     if (progress >= 100) setPlaying(false);
   }, [progress]);
+  // As the sea parts, greet signed-out visitors with the login screen.
+  useEffect(() => {
+    if (!introRevealed || !authChecked || user || introLoginShown.current) return;
+    introLoginShown.current = true;
+    setAuthMode("login");
+    setModal("auth");
+  }, [introRevealed, authChecked, user]);
   const route = result?.routes.find((x) => x.id === selected),
     cargo = catalog?.cargo_types[inputs.cargo_type];
   const change = (key, value) => setInputs((p) => ({ ...p, [key]: value }));
@@ -1146,6 +1157,12 @@ export default function App() {
           <footer><span>Bon Voyage</span><span>California coastal planning</span></footer>
         </div>
       </main>
+      {introState === "playing" && (
+        <Intro
+          onReveal={() => setIntroRevealed(true)}
+          onDone={() => setIntroState("done")}
+        />
+      )}
       {modal === "auth" && (
         <Auth
           mode={authMode}
