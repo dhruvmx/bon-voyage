@@ -169,7 +169,7 @@ export default function App() {
     [query, setQuery] = useState("");
   const [introState, setIntroState] = useState("playing"),
     [introRevealed, setIntroRevealed] = useState(false),
-    introLoginShown = useRef(false);
+    introLoginShown = useRef(true);
   const closeModal = useCallback(() => setModal(null), []),
     requestNo = useRef(0),
     desiredRoute = useRef(null),
