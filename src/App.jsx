@@ -28,6 +28,7 @@ import { api, download } from "./api";
 import VoyageMap from "./Map";
 import Appearance from "./Appearance";
 import Intro from "./Intro";
+import SidebarControls from "./SidebarControls";
 
 const freshInputs = () => ({
   origin: "la",
@@ -353,6 +354,7 @@ export default function App() {
   return (
     <>
       <aside className="sidebar">
+        <div className="sidebar-heading">
         <button
           className="brand"
           aria-label="Bon Voyage home"
@@ -361,12 +363,15 @@ export default function App() {
           <Waves size={31} />
           <span>Bon Voyage</span>
         </button>
+        <SidebarControls />
+        </div>
+        <div className="sidebar-content" tabIndex={0} role="region" aria-label="Sidebar navigation and profile">
         <div className="workspace">
           <div>
             <strong>{user?.company || "Pacific operations"}</strong>
           </div>
         </div>
-        <nav>
+        <nav id="sidebar-navigation" aria-label="Workspace navigation">
           {[
             ["planner", "Route planner", Compass],
             ["voyages", "My voyages", Flag],
@@ -376,6 +381,7 @@ export default function App() {
             <button
               key={id}
               aria-label={label}
+              title={label}
               className={view === id ? "active" : ""}
               onClick={() => switchView(id)}
             >
@@ -401,6 +407,7 @@ export default function App() {
           </span>
           <Settings size={15} />
         </button>
+        </div>
       </aside>
       <main>
         <header>

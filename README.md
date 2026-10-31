@@ -52,6 +52,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
 - Responsive layout with mobile navigation.
+- Collapsible, resizable desktop sidebar with remembered width, keyboard resizing, and independent scrolling on short screens. The page and sidebar use themed scrollbars.
 - Five workspace themes (Ocean, Forest, Walnut, Sandstone, Slate) with light, dark, and system modes. Appearance preferences persist on the device and sync across open tabs.
 
 The map and coastline data are bundled and work offline. The California route and habitat datasets are included planning scenarios; API accounts or live AIS/whale feeds are not required. Planning and saved records work locally and on the public Vercel deployment.
@@ -90,6 +91,8 @@ Interactive API documentation: http://localhost:8000/docs
 ## Styling
 
 Use **Appearance** in the header to choose a theme and a light, dark, or system mode. Changes apply immediately across the workspace and map without a reload or route recalculation. Preferences use browser localStorage and remain usable for the current session if storage is unavailable.
+
+Use the button beside the sidebar logo to collapse or expand navigation. Drag its right edge to resize between 216 and 320 pixels, or focus the edge and use Left/Right, Home, and End. Double-click the edge to reset. Sidebar sizing is saved on the device; mobile keeps the bottom navigation.
 
 Edit semantic color palettes in `src/themes.css` and shared typography, spacing, and layout rules in `src/style.css`. `src/appearance.js` restores preferences before React renders; `src/Appearance.jsx` owns the selector, device-mode updates, and cross-tab sync. No theme framework or external font requests are required. Secondary vessel and cargo inputs remain under the expandable details section.
 
