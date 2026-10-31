@@ -126,6 +126,7 @@
   .speed-segments strong, .speed-segments small { display: block; }
   .speed-segments strong { font-size: 21px; font-weight: 500; margin-bottom: 6px; }
   /* Geographic map: Leaflet owns pan/zoom positioning. */
+  .map-panel { --route-color: var(--cargo-color); }
   .map-wrap { position: relative; isolation: isolate; height: 520px; }
   .map { height: 100%; width: 100%; z-index: 1; }
   .leaflet-container { background: var(--map-water) !important; font-family: inherit; border-radius: 0; }
@@ -228,6 +229,28 @@
   .mode-option { gap: 6px; justify-content: center; padding: 9px 4px; font-size: 13px; border-radius: 7px; }
   .mode-option:has(input:checked) { background: var(--surface); color: var(--accent); border-color: var(--border); }
   .appearance-note { display: block; font-size: 11px; margin-top: 18px; }
+  /* Dark surfaces use gentle elevation; accents stay on decisions and actions. */
+  :root[data-mode="dark"] :is(.sidebar, header) {
+    background: color-mix(in srgb, var(--background), var(--surface) 45%);
+  }
+  :root[data-mode="dark"] :is(.appearance-panel, dialog, .layer-menu) {
+    background: color-mix(in srgb, var(--surface), var(--border) 24%);
+    box-shadow: var(--popover-shadow);
+  }
+  :root[data-mode="dark"] dialog::backdrop { background: #05090db3; }
+  :root[data-mode="dark"] :is(.field input:not([type=range]), .field select, .field textarea, .search input) {
+    background: color-mix(in srgb, var(--background), var(--surface) 50%);
+  }
+  :root[data-mode="dark"] :is(.field input, .field select, .field textarea, .search input):focus-visible {
+    border-color: var(--accent);
+  }
+  :root[data-mode="dark"] :is(.stat, .route-card, .saved-card) { box-shadow: 0 1px 0 #ffffff04 inset; }
+  :root[data-mode="dark"] .route-card.selected {
+    border-color: color-mix(in srgb, var(--accent), var(--border) 45%);
+    box-shadow: 0 2px 0 var(--accent) inset;
+  }
+  :root[data-mode="dark"] .leaflet-control-attribution a { color: var(--muted); }
+  :root[data-mode="dark"] .map-panel { --route-color: color-mix(in srgb, var(--cargo-color), white 30%); }
   /* Two breakpoints, shared by every page. */
   @media (max-width: 1150px) {
     .sidebar { width: 76px; padding: 24px 10px; align-items: center; }

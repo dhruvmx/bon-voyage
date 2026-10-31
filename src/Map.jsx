@@ -89,8 +89,8 @@ export default function VoyageMap({
             .bindTooltip(r.name)
             .addTo(group),
         );
-    L.polyline(route.coordinates, { color: "var(--surface)", weight: 9 }).addTo(group);
-    L.polyline(route.coordinates, { color, weight: 5 })
+    L.polyline(route.coordinates, { color: "var(--route-halo)", weight: 9 }).addTo(group);
+    L.polyline(route.coordinates, { color: "var(--route-color)", weight: 5 })
       .bindTooltip(`${route.name} · ${route.speed} kn open water`)
       .addTo(group);
     let chunk = [],
@@ -155,7 +155,7 @@ export default function VoyageMap({
     }
   }, [progress, route, layers]);
   return (
-    <section className="panel map-panel">
+    <section className="panel map-panel" style={{ "--cargo-color": color }}>
       <div className="panel-heading">
         <div>
           <h2>Route map</h2>
@@ -216,7 +216,7 @@ export default function VoyageMap({
       </div>
       <div className="map-legend">
         <span>
-          <i style={{ background: color }} /> Open water
+          <i style={{ background: "var(--route-color)" }} /> Open water
         </span>
         <span>
           <i style={{ background: "var(--protected)" }} /> 10 kn protected transit

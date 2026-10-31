@@ -169,7 +169,7 @@ export default function App() {
     [query, setQuery] = useState("");
   const [introState, setIntroState] = useState("playing"),
     [introRevealed, setIntroRevealed] = useState(false),
-    introLoginShown = useRef(true);
+    introLoginShown = useRef(false);
   const closeModal = useCallback(() => setModal(null), []),
     requestNo = useRef(0),
     desiredRoute = useRef(null),
@@ -255,8 +255,15 @@ export default function App() {
   useEffect(() => {
     if (progress >= 100) setPlaying(false);
   }, [progress]);
-  // As the sea parts, greet signed-out visitors with the login screen.
-
+  const route = result?.routes.find((x) => x.id === selected),
+    cargo = catalog?.cargo_types[inputs.cargo_type];
+  const change = (key, value) => setInputs((p) => ({ ...p, [key]: value }));
+  const requireAuth = () => {
+    if (user) return true;
+    setAuthMode("signup");
+    setModal("auth");
+    return false;
+  };
   const switchView = (name) => {
     setView(name);
     setPlaying(false);
@@ -1717,5 +1724,6 @@ function Insights({ voyages, onPlan }) {
     </>
   );
 }
+
 
 
