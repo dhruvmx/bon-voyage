@@ -1,6 +1,6 @@
 # Bon Voyage
 
-React + Vite frontend, Python FastAPI backend, and SQLite storage. A complete local maritime food logistics prototype with account-based workspaces and a minimal, consistent dashboard.
+React + Vite frontend, Python FastAPI backend, Neon PostgreSQL for Vercel, and SQLite for local installs. A complete local maritime food logistics prototype with account-based workspaces and a minimal, consistent dashboard.
 
 ## Start
 
@@ -42,7 +42,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 
 - Email/password signup and login; PBKDF2 salted password hashes; server-side opaque sessions; HttpOnly, SameSite cookies; login throttling and cross-origin write checks.
 - Server-enforced account isolation for vessel and voyage CRUD. Password changes revoke previous sessions.
-- Persistent SQLite storage in `data/tideway.sqlite3`, excluded from Git. Restarting the server preserves accounts and records.
+- Persistent Neon PostgreSQL storage in production. Local installs use SQLite; existing local data is retained. Database credentials remain in server-only environment variables.
 - Python route optimization over sampled geographic sea waypoints for Los Angeles, Oakland, San Diego, and Humboldt Bay, in either direction.
 - Protected segment speeds at or below 10 knots, vessel maximum-speed limits, arrival feasibility, temperature-dependent freshness, shelf-life decay, cubic fuel calculation, CO₂ estimates, and whale exposure scores.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
@@ -79,7 +79,7 @@ Interactive API documentation: http://localhost:8000/docs
 
 `src/App.jsx` owns React workspace state and forms. `src/Map.jsx` integrates Leaflet. `src/api.js` handles requests and exports. `backend/main.py` handles accounts, persistence, validation, and static delivery. `backend/routing.py` implements route calculations. `backend/test_app.py` exercises the complete API.
 
-`BON_VOYAGE_DB` overrides the local database path (`TIDEWAY_DB` remains supported for existing local installs). `PORT` overrides the launcher port. Set `COOKIE_SECURE=true` when serving behind HTTPS. The Python server serves the built Vite frontend from the same origin. Use a persistent filesystem if deploying this SQLite configuration. The earlier hosted static Site remains separate from this local full-stack version.
+`BON_VOYAGE_DB` overrides the local database path (`TIDEWAY_DB` remains supported for existing local installs). `PORT` overrides the launcher port. Set `COOKIE_SECURE=true` when serving behind HTTPS. The Python server serves the built Vite frontend from the same origin. On Vercel, connect the Neon integration: DATABASE_URL selects PostgreSQL automatically. Deployment refuses ephemeral SQLite storage. The earlier hosted static Site remains separate from this local full-stack version.
 
 
 ## Styling
@@ -90,8 +90,11 @@ Edit the variables at the top of src/style.css to change colors, typography, spa
 
 ## Vercel deployment
 
-The project includes vercel.json and pyproject.toml with the FastAPI entrypoint backend.main:app. Vercel runs npm ci and npm run build, then serves the React build with the Python API. Production account and voyage storage requires a connected hosted database; local SQLite files are not persistent on Vercel. Keep database credentials in Vercel environment variables, never in source control.
+The project includes vercel.json and pyproject.toml with the FastAPI entrypoint backend.main:app. Vercel runs npm ci and npm run build, then serves the React build with the Python API. The connected Neon database supplies DATABASE_URL to production and preview deployments. Python initializes the tables and indexes transactionally; migrations are serialized with a Postgres advisory lock. Local SQLite files are not used on Vercel. Keep database credentials in Vercel environment variables, never in source control.
 
 Repository: https://github.com/dhruvmx/bon-voyage
+
+
+Production storage adapter: backend/database.py. Neon uses psycopg with pooled connections, transaction commits/rollbacks, and dictionary rows. The local interface remains compatible with SQLite so the same API tests can run without cloud credentials.
 
 

@@ -7,24 +7,30 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 from .routing import PORTS, CARGOS, ZONES, plan
+from .database import connect, database_url, INTEGRITY_ERRORS
 
 ROOT=Path(__file__).resolve().parents[1]
 DB=Path(os.environ.get('BON_VOYAGE_DB',os.environ.get('TIDEWAY_DB',str(ROOT/'data'/'tideway.sqlite3'))))
-DB.parent.mkdir(parents=True,exist_ok=True)
+if not database_url() and not os.environ.get('VERCEL'):
+    DB.parent.mkdir(parents=True,exist_ok=True)
 SECURE=os.environ.get('COOKIE_SECURE','true' if os.environ.get('VERCEL') else 'false').lower()=='true'
 app=FastAPI(title='Bon Voyage API',version='2.0.0')
 
 @contextmanager
 def db():
-    connection=sqlite3.connect(DB,timeout=15); connection.row_factory=sqlite3.Row
-    connection.execute('PRAGMA foreign_keys=ON')
+    connection=connect(DB)
     try:
         yield connection
         connection.commit()
+    except BaseException:
+        connection.rollback()
+        raise
     finally: connection.close()
 
 def init_db():
     with db() as c:
+        if database_url():
+            c.execute('SELECT pg_advisory_xact_lock(754982013)')
         c.executescript('''
         PRAGMA journal_mode=WAL;
         CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,company TEXT NOT NULL DEFAULT '',role TEXT NOT NULL DEFAULT 'Fleet operator',salt TEXT NOT NULL,password_hash TEXT NOT NULL,created_at REAL NOT NULL);
@@ -32,6 +38,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS vessels(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS voyages(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS login_attempts(key TEXT NOT NULL,at REAL NOT NULL);
+        CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires);
+        CREATE INDEX IF NOT EXISTS attempts_key_idx ON login_attempts(key,at);
+        CREATE INDEX IF NOT EXISTS vessels_user_idx ON vessels(user_id);
+        CREATE INDEX IF NOT EXISTS voyages_user_idx ON voyages(user_id);
         ''')
 init_db()
 
@@ -86,7 +96,7 @@ class PasswordChange(BaseModel):
 @app.get('/api/health')
 def health():
     with db() as c: c.execute('SELECT 1')
-    return {'status':'ok','version':'2.0.0','storage':'sqlite'}
+    return {'status':'ok','version':'2.0.0','storage':'postgresql' if database_url() else 'sqlite'}
 @app.post('/api/auth/signup',status_code=201)
 def signup(p:Signup,response:Response):
     if len(p.password)<8: raise HTTPException(422,'Use a password of at least 8 characters.')
@@ -94,7 +104,7 @@ def signup(p:Signup,response:Response):
     uid=secrets.token_hex(12); salt=secrets.token_hex(16)
     try:
         with db() as c: c.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?,?)',(uid,p.email,p.name.strip(),p.company.strip(),'Fleet operator',salt,hash_password(p.password,salt),time.time()))
-    except sqlite3.IntegrityError: raise HTTPException(409,'An account with this email already exists. Log in instead.')
+    except INTEGRITY_ERRORS: raise HTTPException(409,'An account with this email already exists. Log in instead.')
     session(response,uid)
     return {'id':uid,'email':p.email,'name':p.name.strip(),'company':p.company.strip(),'role':'Fleet operator'}
 @app.post('/api/auth/login')
@@ -102,7 +112,7 @@ def login(p:Credentials,request:Request,response:Response):
     key=hashlib.sha256((p.email+'|'+(request.client.host if request.client else '')).encode()).hexdigest()
     with db() as c:
         c.execute('DELETE FROM login_attempts WHERE at<?',(time.time()-900,))
-        if c.execute('SELECT COUNT(*) FROM login_attempts WHERE key=?',(key,)).fetchone()[0]>=10: raise HTTPException(429,'Too many attempts. Try again in 15 minutes.')
+        if c.execute('SELECT COUNT(*) AS attempts FROM login_attempts WHERE key=?',(key,)).fetchone()['attempts']>=10: raise HTTPException(429,'Too many attempts. Try again in 15 minutes.')
         row=c.execute('SELECT * FROM users WHERE email=?',(p.email,)).fetchone()
     actual=hash_password(p.password,row['salt'] if row else '00'*16)
     if not row or not hmac.compare_digest(actual,row['password_hash']):
@@ -240,6 +250,8 @@ def delete_voyage(vid:str,user=Depends(current_user)):
 if (ROOT/'dist'/'assets').exists(): app.mount('/assets',StaticFiles(directory=ROOT/'dist'/'assets'),name='assets')
 @app.get('/coastline.geojson',include_in_schema=False)
 def coastline(): return FileResponse(ROOT/'public'/'coastline.geojson',media_type='application/geo+json')
+@app.get('/favicon.svg',include_in_schema=False)
+def favicon(): return FileResponse(ROOT/'public'/'favicon.svg',media_type='image/svg+xml')
 @app.get('/{path:path}',include_in_schema=False)
 def frontend(path:str):
     if path.startswith('api/'): raise HTTPException(404,'API endpoint not found.')
