@@ -1,0 +1,249 @@
+import hashlib, hmac, json, os, re, secrets, sqlite3, time
+from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from fastapi import FastAPI, Request, Response, HTTPException, Depends
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field, field_validator, model_validator
+from .routing import PORTS, CARGOS, ZONES, plan
+
+ROOT=Path(__file__).resolve().parents[1]
+DB=Path(os.environ.get('TIDEWAY_DB',str(ROOT/'data'/'tideway.sqlite3')))
+DB.parent.mkdir(parents=True,exist_ok=True)
+SECURE=os.environ.get('COOKIE_SECURE','false').lower()=='true'
+app=FastAPI(title='Tideway API',version='2.0.0')
+
+@contextmanager
+def db():
+    connection=sqlite3.connect(DB,timeout=15); connection.row_factory=sqlite3.Row
+    connection.execute('PRAGMA foreign_keys=ON')
+    try:
+        yield connection
+        connection.commit()
+    finally: connection.close()
+
+def init_db():
+    with db() as c:
+        c.executescript('''
+        PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,company TEXT NOT NULL DEFAULT '',role TEXT NOT NULL DEFAULT 'Fleet operator',salt TEXT NOT NULL,password_hash TEXT NOT NULL,created_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS vessels(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS voyages(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS login_attempts(key TEXT NOT NULL,at REAL NOT NULL);
+        ''')
+init_db()
+
+@app.middleware('http')
+async def security(request,call_next):
+    if request.method not in ('GET','HEAD','OPTIONS'):
+        origin=request.headers.get('origin')
+        if origin and origin.split('://',1)[-1]!=request.headers.get('host'):
+            return Response('Cross-origin write rejected',status_code=403)
+    response=await call_next(request)
+    response.headers['X-Content-Type-Options']='nosniff'
+    response.headers['Referrer-Policy']='same-origin'
+    response.headers['X-Frame-Options']='DENY'
+    if request.url.path.startswith('/api/'): response.headers['Cache-Control']='no-store'
+    return response
+
+def hash_password(password,salt):
+    return hashlib.pbkdf2_hmac('sha256',password.encode(),bytes.fromhex(salt),310000).hex()
+def public_user(row): return {k:row[k] for k in ('id','email','name','company','role')}
+def current_user(request:Request):
+    token=request.cookies.get('tideway_session',''); digest=hashlib.sha256(token.encode()).hexdigest()
+    with db() as c: row=c.execute('SELECT u.* FROM users u JOIN sessions s ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?',(digest,time.time())).fetchone()
+    if not row: raise HTTPException(401,'Please log in to your workspace.')
+    return public_user(row)
+def session(response,user_id):
+    token=secrets.token_urlsafe(32)
+    with db() as c:
+        c.execute('DELETE FROM sessions WHERE expires<?',(time.time(),))
+        c.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),user_id,time.time()+7*86400))
+    response.set_cookie('tideway_session',token,httponly=True,secure=SECURE,samesite='lax',max_age=7*86400,path='/')
+
+class Credentials(BaseModel):
+    email:str=Field(min_length=3,max_length=254)
+    password:str=Field(min_length=1,max_length=128)
+    @field_validator('email')
+    @classmethod
+    def email_format(cls,v):
+        v=v.strip().lower()
+        if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',v): raise ValueError('Enter a valid email address.')
+        return v
+class Signup(Credentials):
+    name:str=Field(min_length=2,max_length=80)
+    company:str=Field(default='',max_length=120)
+class Profile(BaseModel):
+    name:str=Field(min_length=2,max_length=80)
+    company:str=Field(default='',max_length=120)
+    role:str=Field(default='Fleet operator',min_length=2,max_length=80)
+class PasswordChange(BaseModel):
+    current_password:str=Field(min_length=1,max_length=128)
+    new_password:str=Field(min_length=8,max_length=128)
+
+@app.get('/api/health')
+def health():
+    with db() as c: c.execute('SELECT 1')
+    return {'status':'ok','version':'2.0.0','storage':'sqlite'}
+@app.post('/api/auth/signup',status_code=201)
+def signup(p:Signup,response:Response):
+    if len(p.password)<8: raise HTTPException(422,'Use a password of at least 8 characters.')
+    if not p.name.strip(): raise HTTPException(422,'Enter your name.')
+    uid=secrets.token_hex(12); salt=secrets.token_hex(16)
+    try:
+        with db() as c: c.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?,?)',(uid,p.email,p.name.strip(),p.company.strip(),'Fleet operator',salt,hash_password(p.password,salt),time.time()))
+    except sqlite3.IntegrityError: raise HTTPException(409,'An account with this email already exists. Log in instead.')
+    session(response,uid)
+    return {'id':uid,'email':p.email,'name':p.name.strip(),'company':p.company.strip(),'role':'Fleet operator'}
+@app.post('/api/auth/login')
+def login(p:Credentials,request:Request,response:Response):
+    key=hashlib.sha256((p.email+'|'+(request.client.host if request.client else '')).encode()).hexdigest()
+    with db() as c:
+        c.execute('DELETE FROM login_attempts WHERE at<?',(time.time()-900,))
+        if c.execute('SELECT COUNT(*) FROM login_attempts WHERE key=?',(key,)).fetchone()[0]>=10: raise HTTPException(429,'Too many attempts. Try again in 15 minutes.')
+        row=c.execute('SELECT * FROM users WHERE email=?',(p.email,)).fetchone()
+    actual=hash_password(p.password,row['salt'] if row else '00'*16)
+    if not row or not hmac.compare_digest(actual,row['password_hash']):
+        with db() as c: c.execute('INSERT INTO login_attempts VALUES(?,?)',(key,time.time()))
+        raise HTTPException(401,'Email or password is incorrect.')
+    with db() as c: c.execute('DELETE FROM login_attempts WHERE key=?',(key,))
+    session(response,row['id']); return public_user(row)
+@app.post('/api/auth/logout')
+def logout(request:Request,response:Response):
+    with db() as c: c.execute('DELETE FROM sessions WHERE token_hash=?',(hashlib.sha256(request.cookies.get('tideway_session','').encode()).hexdigest(),))
+    response.delete_cookie('tideway_session',path='/'); return {'ok':True}
+@app.get('/api/auth/me')
+def me(user=Depends(current_user)): return user
+@app.put('/api/profile')
+def profile(p:Profile,user=Depends(current_user)):
+    if not p.name.strip(): raise HTTPException(422,'Enter your name.')
+    with db() as c: c.execute('UPDATE users SET name=?,company=?,role=? WHERE id=?',(p.name.strip(),p.company.strip(),p.role.strip(),user['id']))
+    return {**user,**p.model_dump()}
+@app.put('/api/auth/password')
+def password(p:PasswordChange,response:Response,user=Depends(current_user)):
+    with db() as c:
+        row=c.execute('SELECT * FROM users WHERE id=?',(user['id'],)).fetchone()
+        if not hmac.compare_digest(hash_password(p.current_password,row['salt']),row['password_hash']): raise HTTPException(400,'Current password is incorrect.')
+        salt=secrets.token_hex(16)
+        c.execute('UPDATE users SET salt=?,password_hash=? WHERE id=?',(salt,hash_password(p.new_password,salt),user['id']))
+        c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],))
+    session(response,user['id']); return {'ok':True}
+
+class PlanInput(BaseModel):
+    origin:str='la'
+    destination:str='oakland'
+    cargo_type:str='avocados'
+    cargo_name:str=Field(default='Avocados',min_length=1,max_length=100)
+    weight:float=Field(default=240,gt=0,le=100000)
+    temperature:float=Field(default=5,ge=-30,le=40)
+    shelf_life:float=Field(default=336,gt=0,le=100000)
+    cargo_age:float=Field(default=0,ge=0,le=100000)
+    arrival_window:float=Field(default=36,ge=1,le=720)
+    max_speed:float=Field(default=24,ge=5,le=35)
+    fuel_per_day:float=Field(default=35,gt=0,le=500)
+    whale_activity:float=Field(default=1,ge=.25,le=3)
+    departure:str
+    @model_validator(mode='after')
+    def valid(self):
+        ids={x['id'] for x in PORTS}
+        if self.origin not in ids or self.destination not in ids or self.origin==self.destination: raise ValueError('Choose two different supported ports.')
+        if self.cargo_type not in CARGOS: raise ValueError('Choose a supported cargo category.')
+        dt=datetime.fromisoformat(self.departure.replace('Z','+00:00'))
+        if not dt.tzinfo: raise ValueError('Departure needs a timezone.')
+        return self
+@app.get('/api/catalog')
+def catalog(): return {'ports':PORTS,'cargo_types':CARGOS,'zones':ZONES}
+@app.post('/api/plan')
+def calculate(p:PlanInput): return plan(p)
+
+class Vessel(BaseModel):
+    name:str=Field(min_length=2,max_length=100)
+    imo:str=Field(default='',max_length=7)
+    max_speed:float=Field(default=24,ge=5,le=35)
+    fuel_per_day:float=Field(default=35,gt=0,le=500)
+    capacity:float=Field(default=12000,gt=0,le=500000)
+    @field_validator('imo')
+    @classmethod
+    def check_imo(cls,v):
+        if v and not re.fullmatch(r'\d{7}',v): raise ValueError('IMO must be seven digits or blank.')
+        return v
+class Voyage(BaseModel):
+    name:str=Field(min_length=2,max_length=120)
+    vessel_id:str|None=None
+    notes:str=Field(default='',max_length=3000)
+    status:str='Planned'
+    route_id:str='balanced'
+    inputs:PlanInput
+    @field_validator('status')
+    @classmethod
+    def valid_status(cls,v):
+        if v not in ['Planned','In transit','Arrived']: raise ValueError('Invalid voyage status.')
+        return v
+
+def list_records(table,user):
+    with db() as c: rows=c.execute(f'SELECT * FROM {table} WHERE user_id=? ORDER BY created_at DESC',(user['id'],)).fetchall()
+    return [{'id':r['id'],**json.loads(r['data']),'created_at':r['created_at']} for r in rows]
+def owned_record(c,table,record_id,user):
+    row=c.execute(f'SELECT * FROM {table} WHERE id=? AND user_id=?',(record_id,user['id'])).fetchone()
+    if not row: raise HTTPException(404,'Record not found.')
+    return row
+@app.get('/api/vessels')
+def vessels(user=Depends(current_user)): return list_records('vessels',user)
+@app.post('/api/vessels',status_code=201)
+def add_vessel(p:Vessel,user=Depends(current_user)):
+    vid=secrets.token_hex(12)
+    with db() as c: c.execute('INSERT INTO vessels VALUES(?,?,?,?)',(vid,user['id'],p.model_dump_json(),time.time()))
+    return {'id':vid,**p.model_dump()}
+@app.put('/api/vessels/{vid}')
+def edit_vessel(vid:str,p:Vessel,user=Depends(current_user)):
+    with db() as c:
+        owned_record(c,'vessels',vid,user)
+        c.execute('UPDATE vessels SET data=? WHERE id=?',(p.model_dump_json(),vid))
+    return {'id':vid,**p.model_dump()}
+@app.delete('/api/vessels/{vid}')
+def delete_vessel(vid:str,user=Depends(current_user)):
+    with db() as c:
+        owned_record(c,'vessels',vid,user)
+        c.execute('DELETE FROM vessels WHERE id=?',(vid,))
+    return {'ok':True}
+def voyage_data(p,user):
+    if p.vessel_id:
+        with db() as c: vessel=json.loads(owned_record(c,'vessels',p.vessel_id,user)['data'])
+        if p.inputs.weight>vessel['capacity']: raise HTTPException(422,'Cargo weight exceeds vessel capacity.')
+        if p.inputs.max_speed>vessel['max_speed']: raise HTTPException(422,'Planning speed exceeds vessel maximum speed.')
+    result=plan(p.inputs)
+    chosen=next((r for r in result['routes'] if r['id']==p.route_id),None)
+    if not chosen: raise HTTPException(422,'Choose a valid route.')
+    return {**p.model_dump(),'result':chosen}
+@app.get('/api/voyages')
+def voyages(user=Depends(current_user)): return list_records('voyages',user)
+@app.post('/api/voyages',status_code=201)
+def add_voyage(p:Voyage,user=Depends(current_user)):
+    data=voyage_data(p,user); vid=secrets.token_hex(12); now=time.time()
+    with db() as c: c.execute('INSERT INTO voyages VALUES(?,?,?,?,?)',(vid,user['id'],json.dumps(data),now,now))
+    return {'id':vid,**data}
+@app.put('/api/voyages/{vid}')
+def edit_voyage(vid:str,p:Voyage,user=Depends(current_user)):
+    with db() as c: owned_record(c,'voyages',vid,user)
+    data=voyage_data(p,user)
+    with db() as c: c.execute('UPDATE voyages SET data=?,updated_at=? WHERE id=?',(json.dumps(data),time.time(),vid))
+    return {'id':vid,**data}
+@app.delete('/api/voyages/{vid}')
+def delete_voyage(vid:str,user=Depends(current_user)):
+    with db() as c:
+        owned_record(c,'voyages',vid,user)
+        c.execute('DELETE FROM voyages WHERE id=?',(vid,))
+    return {'ok':True}
+
+if (ROOT/'dist'/'assets').exists(): app.mount('/assets',StaticFiles(directory=ROOT/'dist'/'assets'),name='assets')
+@app.get('/coastline.geojson',include_in_schema=False)
+def coastline(): return FileResponse(ROOT/'public'/'coastline.geojson',media_type='application/geo+json')
+@app.get('/{path:path}',include_in_schema=False)
+def frontend(path:str):
+    if path.startswith('api/'): raise HTTPException(404,'API endpoint not found.')
+    if (ROOT/'dist'/'index.html').exists(): return FileResponse(ROOT/'dist'/'index.html')
+    raise HTTPException(503,'Build the frontend with npm run build, or run the Vite dev server on port 5173.')
+
+
