@@ -3,7 +3,7 @@
   "framework": "fastapi",
   "buildCommand": "npm ci && npm run build",
   "functions": {
-    "backend/main.py": { "maxDuration": 60 }
+    "app.py": { "maxDuration": 60 }
   }
 }
 

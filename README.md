@@ -90,11 +90,12 @@ Edit the variables at the top of src/style.css to change colors, typography, spa
 
 ## Vercel deployment
 
-The project includes vercel.json and pyproject.toml with the FastAPI entrypoint backend.main:app. Vercel runs npm ci and npm run build, then serves the React build with the Python API. The connected Neon database supplies DATABASE_URL to production and preview deployments. Python initializes the tables and indexes transactionally; migrations are serialized with a Postgres advisory lock. Local SQLite files are not used on Vercel. Keep database credentials in Vercel environment variables, never in source control.
+The project includes vercel.json and the standard FastAPI entrypoint app.py, which imports backend.main:app. Python dependencies are installed from the root requirements.txt. Vercel runs npm ci and npm run build, then serves the React build with the Python API. The connected Neon database supplies DATABASE_URL to production and preview deployments. Python initializes the tables and indexes transactionally; migrations are serialized with a Postgres advisory lock. Local SQLite files are not used on Vercel. Keep database credentials in Vercel environment variables, never in source control.
 
 Repository: https://github.com/dhruvmx/bon-voyage
 
 
 Production storage adapter: backend/database.py. Neon uses psycopg with pooled connections, transaction commits/rollbacks, and dictionary rows. The local interface remains compatible with SQLite so the same API tests can run without cloud credentials.
+
 
 
