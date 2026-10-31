@@ -18,37 +18,144 @@ export default function VoyageMap({
     overlays = useRef(null),
     ship = useRef(null),
     initialBounds = useRef(null);
+
   const [layers, setLayers] = useState({
     habitat: true,
     vsr: true,
     alternatives: true,
   });
-  const [showLayers, setShowLayers] = useState(false),
-    [tileError, setTileError] = useState(false);
+  const [showLayers, setShowLayers] = useState(false);
+  const [tileError, setTileError] = useState(false);
+
   useEffect(() => {
+    if (!host.current || map.current) return;
+
+    // Initialize Leaflet map instance centered on global view
+    // Infinite horizontal scroll: no maxBounds, worldCopyJump for smooth wrapping
     const instance = L.map(host.current, {
-      scrollWheelZoom: false,
-      zoomControl: true,
-    }).setView([35.8, -121], 6);
+	    scrollWheelZoom: true,
+	    zoomControl: true,
+	    center: [20, 0],
+	    zoom: 2,
+	    minZoom: 2,
+	    worldCopyJump: true,
+	    maxBoundsViscosity: 0,
+	    // Allow infinite horizontal panning
+	    maxBounds: undefined,
+	    inertia: true,
+    });
+
     map.current = instance;
     overlays.current = L.layerGroup().addTo(instance);
-    instance.createPane('land');
-    instance.getPane('land').style.zIndex = 220;
+
+    instance.createPane("land");
+    instance.getPane("land").style.zIndex = 220;
+
     let active = true;
-    fetch('/coastline.geojson').then(r => {
-      if (!r.ok) throw new Error('Coastline unavailable');
-      return r.json();
-    }).then(data => {
-      if (!active) return;
-      L.geoJSON(data, {pane:'land', interactive:false, style:{color:'var(--border)',weight:1.2,fillColor:'var(--map-land)',fillOpacity:1}}).addTo(instance);
-    }).catch(() => active && setTileError(true));
-    instance.attributionControl.addAttribution('<a href="https://www.naturalearthdata.com/">Natural Earth</a> · Public domain');
-    for (let lat=30;lat<=43;lat++) L.polyline([[lat,-132],[lat,-114]],{color:'var(--map-grid)',weight:.5,opacity:.6,interactive:false}).addTo(instance);
-    for (let lon=-130;lon<=-115;lon++) L.polyline([[29,lon],[44,lon]],{color:'var(--map-grid)',weight:.5,opacity:.6,interactive:false}).addTo(instance);
-    const labels=[['CALIFORNIA',36.2,-119.3,'region'],['NORTH PACIFIC OCEAN',35.7,-124.7,'ocean'],['San Francisco',37.8,-122.4,'city'],['Monterey',36.6,-121.9,'city'],['Santa Barbara',34.42,-119.7,'city'],['Los Angeles',34.05,-118.24,'city'],['San Diego',32.72,-117.16,'city'],['Humboldt Bay',40.8,-124.16,'city']];
-    labels.forEach(([name,lat,lon,type]) => L.marker([lat,lon],{pane:'markerPane',interactive:false,icon:L.divIcon({className:'geo-label '+type,html:name,iconSize:[140,18],iconAnchor:[0,9]})}).addTo(instance));
+
+    // Helper: shift all coordinates in a GeoJSON by a longitude offset
+    const shiftCoords = (coords, offset) => {
+      if (typeof coords[0] === "number") return [coords[0] + offset, coords[1]];
+      return coords.map((c) => shiftCoords(c, offset));
+    };
+    const shiftGeoJSON = (data, offset) => ({
+      ...data,
+      features: data.features.map((f) => ({
+        ...f,
+        geometry: {
+          ...f.geometry,
+          coordinates: shiftCoords(f.geometry.coordinates, offset),
+        },
+      })),
+    });
+
+    const coastlineStyle = {
+      color: "var(--border)",
+      weight: 1.2,
+      fillColor: "var(--map-land)",
+      fillOpacity: 1,
+    };
+
+    fetch("/coastline.geojson")
+      .then((r) => {
+        if (!r.ok) throw new Error("Coastline unavailable");
+        return r.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        // Render coastline at three world copies for infinite horizontal scroll
+        [-360, 0, 360].forEach((offset) => {
+          const gj = offset === 0 ? data : shiftGeoJSON(data, offset);
+          L.geoJSON(gj, {
+            pane: "land",
+            interactive: false,
+            style: coastlineStyle,
+          }).addTo(instance);
+        });
+      })
+      .catch(() => active && setTileError(true));
+
+    instance.attributionControl.addAttribution(
+      '<a href="https://www.naturalearthdata.com/">Natural Earth</a> · Public domain'
+    );
+
+    // Global latitude and longitude grid lines (across all world copies)
+    const gridStyle = {
+      color: "var(--map-grid)",
+      weight: 0.5,
+      opacity: 0.6,
+      interactive: false,
+    };
+    for (let lat = -60; lat <= 60; lat += 30) {
+      L.polyline(
+        [
+          [lat, -540],
+          [lat, 540],
+        ],
+        gridStyle
+      ).addTo(instance);
+    }
+    for (let offset = -360; offset <= 360; offset += 360) {
+      for (let lon = -180; lon <= 180; lon += 30) {
+        L.polyline(
+          [
+            [-80, lon + offset],
+            [80, lon + offset],
+          ],
+          gridStyle
+        ).addTo(instance);
+      }
+    }
+
+    // Key international port and ocean labels (replicated across world copies)
+    const labels = [
+      ["PACIFIC OCEAN", 0, -160, "ocean"],
+      ["ATLANTIC OCEAN", 0, -30, "ocean"],
+      ["INDIAN OCEAN", -20, 80, "ocean"],
+      ["Shanghai", 31.23, 121.47, "city"],
+      ["Singapore", 1.35, 103.82, "city"],
+      ["Rotterdam", 51.92, 4.47, "city"],
+      ["Los Angeles", 33.74, -118.27, "city"],
+    ];
+
+    [-360, 0, 360].forEach((offset) =>
+      labels.forEach(([name, lat, lon, type]) =>
+        L.marker([lat, lon + offset], {
+          pane: "markerPane",
+          interactive: false,
+          icon: L.divIcon({
+            className: "geo-label " + type,
+            html: name,
+            iconSize: [140, 18],
+            iconAnchor: [0, 9],
+          }),
+        }).addTo(instance)
+      )
+    );
+
     const resize = new ResizeObserver(() => instance.invalidateSize());
     resize.observe(host.current);
+
     return () => {
       active = false;
       resize.disconnect();
@@ -56,70 +163,104 @@ export default function VoyageMap({
       map.current = null;
     };
   }, []);
+
   useEffect(() => {
     if (!map.current || !route) return;
     const group = overlays.current;
     group.clearLayers();
-    zones
-      .filter((z) => layers[z.kind === "vsr" ? "vsr" : "habitat"])
-      .forEach((z) =>
-        L.circle([z.lat, z.lon], {
-          radius: z.radius_nm * 1852,
-          color: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
-          fillColor: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
-          fillOpacity: 0.22,
-          dashArray: "6 5",
-          weight: 2,
-        })
-          .bindTooltip(
-            `${z.name}${z.kind === "vsr" ? " · 10 kn maximum" : " · Whale habitat / 10 kn"}`,
-          )
-          .addTo(group),
-      );
-    if (layers.alternatives)
-      routes
-        .filter((r) => r.id !== route.id)
-        .forEach((r) =>
-          L.polyline(r.coordinates, {
-            color: "var(--muted)",
+
+    // Helper to offset a [lat, lng] coordinate pair by a longitude
+    const shiftPt = (pt, offset) => [pt[0], pt[1] + offset];
+    const shiftCoords = (coords, offset) => coords.map((pt) => shiftPt(pt, offset));
+
+    // World copy offsets for infinite horizontal scroll
+    const worldOffsets = [-360, 0, 360];
+
+    worldOffsets.forEach((offset) => {
+      // Protection / habitat zones
+      zones
+        .filter((z) => layers[z.kind === "vsr" ? "vsr" : "habitat"])
+        .forEach((z) =>
+          L.circle([z.lat, z.lon + offset], {
+            radius: z.radius_nm * 1852,
+            color: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
+            fillColor: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
+            fillOpacity: 0.22,
+            dashArray: "6 5",
             weight: 2,
-            dashArray: "5 8",
-            opacity: 0.5,
           })
-            .bindTooltip(r.name)
-            .addTo(group),
+            .bindTooltip(
+              `${z.name}${
+                z.kind === "vsr" ? " · 10 kn maximum" : " · Whale habitat / 10 kn"
+              }`
+            )
+            .addTo(group)
         );
-    L.polyline(route.coordinates, { color: "var(--route-halo)", weight: 9 }).addTo(group);
-    L.polyline(route.coordinates, { color: "var(--route-color)", weight: 5 })
-      .bindTooltip(`${route.name} · ${route.speed} kn open water`)
-      .addTo(group);
-    let chunk = [],
-      lastKind;
-    route.segments.forEach((s, i) => {
-      if (s.kind !== lastKind && chunk.length) {
-        if (lastKind !== "open")
-          L.polyline(chunk, { color: "var(--protected)", weight: 5 }).addTo(group);
-        chunk = [];
-      }
-      chunk.push(s.from, s.to);
-      lastKind = s.kind;
-      if (i === route.segments.length - 1 && s.kind !== "open")
-        L.polyline(chunk, { color: "var(--protected)", weight: 5 }).addTo(group);
-    });
-    [route.coordinates[0], route.coordinates.at(-1)].forEach((p, i) =>
-      L.circleMarker(p, {
-        radius: 7,
-        color: "var(--ink)",
-        weight: 2,
-        fillColor: i ? "var(--protected)" : "var(--surface)",
-        fillOpacity: 1,
+
+      // Alternative routes
+      if (layers.alternatives)
+        routes
+          ?.filter((r) => r.id !== route.id)
+          .forEach((r) =>
+            L.polyline(shiftCoords(r.coordinates, offset), {
+              color: "var(--muted)",
+              weight: 2,
+              dashArray: "5 8",
+              opacity: 0.5,
+            })
+              .bindTooltip(r.name)
+              .addTo(group)
+          );
+
+      // Main route halo + line
+      L.polyline(shiftCoords(route.coordinates, offset), {
+        color: "var(--route-halo)",
+        weight: 9,
+      }).addTo(group);
+      L.polyline(shiftCoords(route.coordinates, offset), {
+        color: "var(--route-color)",
+        weight: 5,
       })
-        .bindTooltip(i ? "Destination port" : "Departure port", {
-          permanent: true,
-          direction: "top",
+        .bindTooltip(`${route.name} · ${route.speed} kn open water`)
+        .addTo(group);
+
+      // Protected transit segments
+      let chunk = [],
+        lastKind;
+      route.segments?.forEach((s, i) => {
+        if (s.kind !== lastKind && chunk.length) {
+          if (lastKind !== "open")
+            L.polyline(chunk, { color: "var(--protected)", weight: 5 }).addTo(
+              group
+            );
+          chunk = [];
+        }
+        chunk.push(shiftPt(s.from, offset), shiftPt(s.to, offset));
+        lastKind = s.kind;
+        if (i === route.segments.length - 1 && s.kind !== "open")
+          L.polyline(chunk, { color: "var(--protected)", weight: 5 }).addTo(
+            group
+          );
+      });
+
+      // Port markers
+      [route.coordinates[0], route.coordinates.at(-1)].forEach((p, i) =>
+        L.circleMarker(shiftPt(p, offset), {
+          radius: 7,
+          color: "var(--ink)",
+          weight: 2,
+          fillColor: i ? "var(--protected)" : "var(--surface)",
+          fillOpacity: 1,
         })
-        .addTo(group),
-    );
+          .bindTooltip(i ? "Destination port" : "Departure port", {
+            permanent: offset === 0, // only permanent tooltip on center copy
+            direction: "top",
+          })
+          .addTo(group)
+      );
+    });
+
+    // Ship marker only on center copy (worldCopyJump keeps it visible)
     ship.current = L.marker(route.coordinates[0], {
       interactive: false,
       icon: L.divIcon({
@@ -129,6 +270,7 @@ export default function VoyageMap({
         iconAnchor: [17, 17],
       }),
     }).addTo(group);
+
     const key = JSON.stringify([
       route.coordinates[0],
       route.coordinates.at(-1),
@@ -138,8 +280,9 @@ export default function VoyageMap({
       initialBounds.current = key;
     }
   }, [route, routes, zones, color, layers]);
+
   useEffect(() => {
-    if (!ship.current || !route) return;
+    if (!ship.current || !route || !route.segments) return;
     const target = (route.hours * progress) / 100;
     let elapsed = 0;
     for (const s of route.segments) {
@@ -154,12 +297,12 @@ export default function VoyageMap({
       elapsed += s.hours;
     }
   }, [progress, route, layers]);
+
   return (
     <section className="panel map-panel" style={{ "--cargo-color": color }}>
       <div className="panel-heading">
         <div>
           <h2>Route map</h2>
-
         </div>
         <button
           className="small-button"
@@ -203,7 +346,9 @@ export default function VoyageMap({
           aria-label="Recenter map"
           onClick={() =>
             route &&
-            map.current.fitBounds(L.latLngBounds(route.coordinates).pad(0.15))
+            map.current?.fitBounds(
+              L.latLngBounds(route.coordinates).pad(0.15)
+            )
           }
         >
           <LocateFixed size={18} />
@@ -219,7 +364,8 @@ export default function VoyageMap({
           <i style={{ background: "var(--route-color)" }} /> Open water
         </span>
         <span>
-          <i style={{ background: "var(--protected)" }} /> 10 kn protected transit
+          <i style={{ background: "var(--protected)" }} /> 10 kn protected
+          transit
         </span>
         <span>
           <i className="habitat-key" /> Whale habitat
@@ -246,13 +392,14 @@ export default function VoyageMap({
         </button>
         <div>
           <strong>
-            {progress >= 100
-              ? "Arrived at destination"
-              : "Voyage preview"}
+            {progress >= 100 ? "Arrived at destination" : "Voyage preview"}
           </strong>
           <small>
             {route
-              ? `${((route.hours * progress) / 100).toFixed(1)} h elapsed · ${(route.hours * (1 - progress / 100)).toFixed(1)} h remaining`
+              ? `${((route.hours * progress) / 100).toFixed(1)} h elapsed · ${(
+                  route.hours *
+                  (1 - progress / 100)
+                ).toFixed(1)} h remaining`
               : "Waiting for route"}
           </small>
         </div>
@@ -273,5 +420,3 @@ export default function VoyageMap({
     </section>
   );
 }
-
-
