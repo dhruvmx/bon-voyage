@@ -1,6 +1,6 @@
 # Tideway 2.0
 
-React + Vite frontend, Python FastAPI backend, and SQLite storage. A complete local maritime food logistics prototype with account-based workspaces and a vintage neo-brutalist dashboard.
+React + Vite frontend, Python FastAPI backend, and SQLite storage. A complete local maritime food logistics prototype with account-based workspaces and a minimal, consistent dashboard.
 
 ## Start
 
@@ -80,5 +80,10 @@ Interactive API documentation: http://localhost:8000/docs
 `src/App.jsx` owns React workspace state and forms. `src/Map.jsx` integrates Leaflet. `src/api.js` handles requests and exports. `backend/main.py` handles accounts, persistence, validation, and static delivery. `backend/routing.py` implements route calculations. `backend/test_app.py` exercises the complete API.
 
 `TIDEWAY_DB` overrides the database path. `PORT` overrides the launcher port. Set `COOKIE_SECURE=true` when serving behind HTTPS. The Python server serves the built Vite frontend from the same origin. Use a persistent filesystem if deploying this SQLite configuration. The earlier hosted static Site remains separate from this local full-stack version.
+
+
+## Styling
+
+Edit the variables at the top of src/style.css to change colors, typography, spacing, or corner radius throughout the app. Shared surface, button, field, and layout rules apply across all pages. The stylesheet has 249 lines and two responsive breakpoints; no CSS framework or generated utility classes are required. Secondary vessel and cargo inputs remain under the expandable details section.
 
 

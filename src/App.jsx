@@ -126,7 +126,7 @@ function ErrorMessage({ error }) {
 }
 function Stat({ label, value, unit, sub, dark, icon: Icon }) {
   return (
-    <article className={"stat " + (dark ? "dark" : "")}>
+    <article className="stat" title={sub}>
       <div className="stat-label">
         {label}
         <Icon size={16} />
@@ -135,8 +135,6 @@ function Stat({ label, value, unit, sub, dark, icon: Icon }) {
         {value}
         <em>{unit}</em>
       </div>
-      <small>{sub}</small>
-      <div className="stat-rule" />
     </article>
   );
 }
@@ -358,17 +356,10 @@ export default function App() {
           <span>tideway.</span>
         </button>
         <div className="workspace">
-          <span className="workspace-mark">
-            {user ? initials(user.company || user.name) : "P"}
-          </span>
           <div>
             <strong>{user?.company || "Pacific operations"}</strong>
-            <small>
-              {user ? "Your maritime workspace" : "Explore the workspace"}
-            </small>
           </div>
         </div>
-        <div className="nav-caption">WORKSPACE</div>
         <nav>
           {[
             ["planner", "Route planner", Compass],
@@ -388,20 +379,6 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-note">
-          <Anchor size={28} />
-          <h3>
-            Small course changes.
-            <br />
-            Ocean-sized impact.
-          </h3>
-          <p>
-            Protect what matters.
-            <br />
-            At sea and on board.
-          </p>
-          <Waves size={90} />
-        </div>
         <button
           className="profile-button"
           aria-label="My profile"
@@ -436,9 +413,6 @@ export default function App() {
             </b>
           </div>
           <div className="header-actions">
-            <span className="connection">
-              <i /> Python API
-            </span>
             <button
               className="icon-button"
               aria-label="How Tideway works"
@@ -481,7 +455,6 @@ export default function App() {
         <div className="page">
           <div className="page-title">
             <div>
-              <div className="eyebrow">OCEAN INTELLIGENCE, IN MOTION</div>
               <h1>
                 {view === "planner"
                   ? "A better way across."
@@ -568,7 +541,7 @@ export default function App() {
                   icon={Clock}
                 />
                 <Stat
-                  label="Fuel vs. 18 kn baseline"
+                  label="Fuel use"
                   value={
                     route
                       ? (route.fuel_delta > 0 ? "+" : "") + route.fuel_delta
@@ -583,7 +556,7 @@ export default function App() {
                   icon={BarChart3}
                 />
                 <Stat
-                  label="Whale protection"
+                  label="Whale safety"
                   value={route ? Math.round(route.protection) : "—"}
                   unit="/100"
                   sub="Protected zones limited to 10 knots"
@@ -603,17 +576,10 @@ export default function App() {
                     playing={playing}
                     setPlaying={setPlaying}
                   />
-                  <div className="scenario-caption">
-                    <span>● California coastal scenario</span>
-                    <span>
-                      Route calculations run in Python · bundled Natural Earth map
-                    </span>
-                  </div>
                 </div>
                 <section className="panel config">
                   <div className="panel-heading">
                     <h2>Plan your passage</h2>
-                    <span className="eyebrow">01 / 02</span>
                   </div>
                   <div className="config-body">
                     <div className="port-pickers">
@@ -674,7 +640,7 @@ export default function App() {
                       </Field>
                     </div>
                     <div className="field-title">
-                      What’s on board?<span>Cargo priority</span>
+                      Cargo
                     </div>
                     <div className="cargo-options">
                       {Object.entries(catalog.cargo_types).map(([id, c]) => (
@@ -684,17 +650,7 @@ export default function App() {
                           aria-pressed={inputs.cargo_type === id}
                           onClick={() => chooseCargo(id)}
                         >
-                          <span>
-                            {id === "berries"
-                              ? "◉"
-                              : id === "avocados"
-                                ? "◐"
-                                : id === "grain"
-                                  ? "♧"
-                                  : "▣"}
-                          </span>
                           <strong>{c.name}</strong>
-                          <small>{c.level}</small>
                           {inputs.cargo_type === id && <Check size={12} />}
                         </button>
                       ))}
@@ -735,10 +691,6 @@ export default function App() {
                         change("arrival_window", Number(e.target.value))
                       }
                     />
-                    <div className="range-ends">
-                      <span>Time critical</span>
-                      <span>Flexible</span>
-                    </div>
                     <details className="advanced">
                       <summary>
                         Vessel, cargo & departure details <Plus size={13} />
@@ -893,19 +845,15 @@ export default function App() {
                           : "Save this passage"}
                       <ArrowUpRight size={18} />
                     </button>
-                    <div className="compliance">
-                      <ShieldCheck size={11} /> Protected speed zones always
-                      respected
-                    </div>
                   </div>
                 </section>
               </div>
               <section className="routes-section">
                 <div className="section-heading">
                   <div>
-                    <h2>One destination. Better possibilities.</h2>
+                    <h2>Compare routes</h2>
                     <p>
-                      Compare passages for your cargo and choose your course.
+                      Choose the passage that fits your cargo.
                     </p>
                   </div>
                   <span className="stamp">
@@ -928,31 +876,24 @@ export default function App() {
                           {selected === r.id && <span />}
                         </span>
                       </div>
-                      <p>
-                        {r.id === "direct"
-                          ? "A shorter passage with protected coastal transit."
-                          : r.id === "balanced"
-                            ? "Fresh cargo, lower fuel use, and space for marine life."
-                            : "A wider berth around sensitive marine habitats."}
-                      </p>
                       <div className="route-metrics">
                         <div>
                           <strong>
                             {r.hours.toFixed(1)}
                             <em> hrs</em>
                           </strong>
-                          <small>TRANSIT TIME</small>
+                          <small>Transit</small>
                         </div>
                         <div>
                           <strong>{r.freshness.toFixed(1)}%</strong>
-                          <small>FRESHNESS</small>
+                          <small>Freshness</small>
                         </div>
                         <div>
                           <strong>
                             {Math.round(r.protection)}
                             <em>/100</em>
                           </strong>
-                          <small>WHALE PROTECTION</small>
+                          <small>Whale safety</small>
                         </div>
                       </div>
                       <div className="route-bottom">
@@ -967,50 +908,12 @@ export default function App() {
                 </div>
               </section>
               {route && (
-                <section className="bottom-grid">
-                  <article className="panel speed-panel">
-                    <div className="section-heading">
-                      <div>
-                        <h2>Speed, with a purpose.</h2>
-                        <p>
-                          Slow down where it matters. Make up time in open
-                          water.
-                        </p>
-                      </div>
-                      <span className="stamp">VSR compliant</span>
-                    </div>
-                    <div className="speed-segments">
-                      <div>
-                        <strong>{Math.min(10, inputs.max_speed)} kn</strong>
-                        <small>
-                          Protected transit · {route.protected_distance} nm
-                        </small>
-                      </div>
-                      <div className="open">
-                        <strong>{route.speed.toFixed(1)} kn</strong>
-                        <small>Open water · {route.open_distance} nm</small>
-                      </div>
-                      <div>
-                        <strong>{route.shelf_remaining.toFixed(0)} h</strong>
-                        <small>Remaining shelf life</small>
-                      </div>
-                    </div>
-                  </article>
-                  <article className="impact-note">
-                    <ArrowUpRight size={45} />
-                    <div>
-                      <div className="eyebrow">THE BIGGER PICTURE</div>
-                      <h3>
-                        Good for the ocean.
-                        <br />
-                        Better for what’s on board.
-                      </h3>
-                      <p>
-                        {inputs.weight.toLocaleString()} tonnes on course.{" "}
-                        {route.freshness.toFixed(1)}% arrival freshness.
-                      </p>
-                    </div>
-                  </article>
+                <section className="panel speed-panel">
+                  <div className="speed-segments">
+                    <div><strong>{Math.min(10, inputs.max_speed)} kn</strong><small>Protected waters</small></div>
+                    <div><strong>{route.speed.toFixed(1)} kn</strong><small>Open-water speed</small></div>
+                    <div><strong>{route.shelf_remaining.toFixed(0)} h</strong><small>Shelf life on arrival</small></div>
+                  </div>
                 </section>
               )}
             </>
@@ -1237,19 +1140,7 @@ export default function App() {
           ) : (
             <Insights voyages={voyages} onPlan={newVoyage} />
           )}
-          <footer>
-            <span>
-              ≋ <strong>tideway.</strong> <span>Made for a living ocean.</span>
-            </span>
-            <span>
-              React + Vite · Python ·{" "}
-              {authChecked
-                ? user
-                  ? "Your account, connected"
-                  : "Guest workspace"
-                : "Connecting…"}
-            </span>
-          </footer>
+          <footer><span>tideway.</span><span>California coastal planning</span></footer>
         </div>
       </main>
       {modal === "auth" && (
@@ -1305,10 +1196,10 @@ export default function App() {
                 {route?.hours.toFixed(1)}h <small>TRANSIT</small>
               </strong>
               <strong>
-                {route?.freshness.toFixed(1)}% <small>FRESHNESS</small>
+                {route?.freshness.toFixed(1)}% <small>Freshness</small>
               </strong>
               <strong>
-                {Math.round(route?.protection)} <small>WHALE PROTECTION</small>
+                {Math.round(route?.protection)} <small>Whale safety</small>
               </strong>
             </div>
             <Field
@@ -1768,7 +1659,7 @@ function Insights({ voyages, onPlan }) {
           icon={Leaf}
         />
         <Stat
-          label="Whale protection"
+          label="Whale safety"
           value={Math.round(protection)}
           unit="/100"
           sub="Average of your saved passages"

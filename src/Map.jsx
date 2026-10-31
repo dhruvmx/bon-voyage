@@ -158,11 +158,8 @@ export default function VoyageMap({
     <section className="panel map-panel">
       <div className="panel-heading">
         <div>
-          <h2>Your voyage, in perspective</h2>
-          <p>
-            California coast <span className="slash">/</span> North Pacific
-            Ocean
-          </p>
+          <h2>Route map</h2>
+
         </div>
         <button
           className="small-button"
@@ -251,7 +248,7 @@ export default function VoyageMap({
           <strong>
             {progress >= 100
               ? "Arrived at destination"
-              : "Preview your passage"}
+              : "Voyage preview"}
           </strong>
           <small>
             {route
