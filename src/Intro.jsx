@@ -1,155 +1,41 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { markIntroSeen } from "./intro";
 
-/*
- * Opening animation: the Red Sea fills the screen, Moses rises from the
- * bottom, lifts his staff, and the waters part to reveal the app.
- *
- * Phases (ms from mount):
- *   0     sea       calm sea at dusk
- *   600   rise      Moses rises from the bottom edge
- *   3200  raise     staff is lifted, light gathers
- *   4300  part      waters split left and right (onReveal fires here)
- *   7100  done      overlay unmounts (onDone fires)
- */
-const TIMELINE = [
-  [600, "rise"],
-  [3200, "raise"],
-  [4300, "part"],
-];
-const END = 7100;
-
-function Moses() {
-  return (
-    <svg
-      className="moses-svg"
-      viewBox="0 0 400 640"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <radialGradient id="staff-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0" stopColor="#fff6c8" stopOpacity="0.95" />
-          <stop offset="0.45" stopColor="#ffd98a" stopOpacity="0.45" />
-          <stop offset="1" stopColor="#ffd98a" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="robe" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#2b2a33" />
-          <stop offset="1" stopColor="#111017" />
-        </linearGradient>
-      </defs>
-
-      {/* Robe */}
-      <path
-        d="M200 150 C150 150 128 190 120 250 C108 350 92 470 74 640 L330 640 C312 470 296 350 284 250 C276 190 250 150 200 150 Z"
-        fill="url(#robe)"
-      />
-      {/* Mantle fold */}
-      <path
-        d="M130 250 C170 290 230 290 270 250 L284 330 C240 360 160 360 116 330 Z"
-        fill="#1c1b24"
-        opacity="0.9"
-      />
-      {/* Left arm (resting) */}
-      <path
-        d="M128 245 C112 300 114 360 132 410 L158 404 C150 360 152 305 166 262 Z"
-        fill="#1c1b24"
-      />
-      {/* Head covering */}
-      <path
-        d="M200 40 C158 40 140 78 142 122 C144 150 160 168 200 168 C240 168 256 150 258 122 C260 78 242 40 200 40 Z"
-        fill="#24232d"
-      />
-      {/* Face */}
-      <ellipse cx="200" cy="112" rx="34" ry="40" fill="#c99a6e" />
-      {/* Beard */}
-      <path
-        d="M168 118 C170 168 188 196 200 202 C212 196 230 168 232 118 C222 140 210 146 200 146 C190 146 178 140 168 118 Z"
-        fill="#e9e5dc"
-      />
-      {/* Brow and eye hints */}
-      <path
-        d="M178 100 q9 -5 18 0 M204 100 q9 -5 18 0"
-        stroke="#3a2d22"
-        strokeWidth="3"
-        fill="none"
-        strokeLinecap="round"
-      />
-
-      {/* Right arm + staff: the arm pivots at the shoulder, the staff
-          counter-rotates at the hand so it stays upright while lifting. */}
-      <g className="m-arm">
-        <path
-          d="M262 242 C284 290 292 340 288 396 L262 396 C264 340 258 296 246 258 Z"
-          fill="#1c1b24"
-        />
-        <circle cx="276" cy="400" r="15" fill="#c99a6e" />
-        <g className="m-staff">
-          <circle className="m-glow" cx="276" cy="20" r="90" fill="url(#staff-glow)" />
-          <rect x="271" y="18" width="10" height="560" rx="5" fill="#6b4a2b" />
-          <path
-            d="M276 18 C262 8 262 -6 276 -12 C290 -6 290 8 276 18 Z"
-            fill="#6b4a2b"
-          />
-        </g>
-      </g>
-    </svg>
-  );
-}
-
-export default function Intro({ onReveal, onDone }) {
-  const [phase, setPhase] = useState("sea");
-  const cb = useRef({ onReveal, onDone });
-  cb.current = { onReveal, onDone };
-
-  // Respect reduced-motion: skip the animation entirely.
-  const reduced = useRef(
-    typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches,
-  );
-
+export default function Intro({ onDone }) {
+  const done = useRef(onDone);
+  done.current = onDone;
   useEffect(() => {
-    if (reduced.current) {
-      cb.current.onReveal();
-      cb.current.onDone();
-      return;
-    }
-    const timers = TIMELINE.map(([ms, name]) =>
-      setTimeout(() => {
-        setPhase(name);
-        if (name === "part") cb.current.onReveal();
-      }, ms),
-    );
-    timers.push(setTimeout(() => cb.current.onDone(), END));
-    return () => timers.forEach(clearTimeout);
+    // Remember the visit immediately, including a refresh halfway through.
+    markIntroSeen();
+    document.documentElement.classList.add("intro-active");
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const timer = setTimeout(() => done.current(), 3300);
+    return () => { clearTimeout(timer); document.body.style.overflow = previous; document.documentElement.classList.remove("intro-active"); };
   }, []);
 
-  const skip = () => {
-    cb.current.onReveal();
-    cb.current.onDone();
-  };
-
-  if (reduced.current) return null;
-
-  return (
-    <div className={"intro phase-" + phase} role="presentation">
-      <div className="intro-sky" />
-      <div className="intro-half intro-left">
-        <div className="intro-waves" />
-      </div>
-      <div className="intro-half intro-right">
-        <div className="intro-waves" />
-      </div>
-      <div className="intro-flash" />
-      <div className="moses">
-        <Moses />
-      </div>
-      <div className="intro-title" aria-hidden="true">
-        Bon Voyage
-      </div>
-      <button type="button" className="intro-skip" onClick={skip}>
-        Skip
-      </button>
+  return <div className="intro" role="dialog" aria-modal="true" aria-label="Welcome to Bon Voyage"
+    onAnimationEnd={(event) => {
+      if (event.target === event.currentTarget && event.animationName === "intro-dismiss") done.current();
+    }}>
+    <div className="intro-atmosphere" aria-hidden="true" />
+    <svg className="intro-chart" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <g fill="none" stroke="currentColor" strokeWidth="1">
+        {[0,1,2,3,4,5].map((n) => <ellipse key={n} cx="720" cy="510" rx={240+n*85} ry={130+n*62} />)}
+        <path d="M720 80V820M100 450H1340" strokeDasharray="3 12" />
+        <path d="M210 690C430 720 470 380 720 450S1060 190 1240 230" strokeDasharray="5 10" />
+      </g>
+    </svg>
+    <div className="intro-current intro-current-left" aria-hidden="true"><svg viewBox="0 0 700 1000" preserveAspectRatio="none"><path d="M0 0H700C360 200 750 370 510 560S420 860 700 1000H0Z" /></svg></div>
+    <div className="intro-current intro-current-right" aria-hidden="true"><svg viewBox="0 0 700 1000" preserveAspectRatio="none"><path d="M0 0H700C360 200 750 370 510 560S420 860 700 1000H0Z" /></svg></div>
+    <div className="intro-brand">
+      <div className="intro-emblem" aria-hidden="true" />
+      <p className="intro-eyebrow">A better way across</p>
+      <h1>Bon Voyage<span>.</span></h1>
+      <div className="intro-horizon" aria-hidden="true" />
+      <p className="intro-caption">Fresh cargo. Safer oceans. Smarter voyages.</p>
     </div>
-  );
+    <span className="intro-coordinate" aria-hidden="true">CHART YOUR COURSE / 01</span>
+    <button type="button" className="intro-skip" autoFocus onClick={() => done.current()}>Skip intro <span aria-hidden="true">↗</span></button>
+  </div>;
 }
-

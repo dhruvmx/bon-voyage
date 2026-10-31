@@ -104,6 +104,8 @@ Departure timestamps require a timezone and a UTC year between 1900 and 2100; un
 `BON_VOYAGE_DB` overrides the local database path (`TIDEWAY_DB` remains supported for existing local installs). `PORT` overrides the launcher port. Set `COOKIE_SECURE=true` when serving behind HTTPS. The Python server serves the built Vite frontend from the same origin. On Vercel, connect the Neon integration: DATABASE_URL selects PostgreSQL automatically. Deployment refuses ephemeral SQLite storage. The earlier hosted static Site remains separate from this local full-stack version.
 
 
+The first visit opens with a short logo-and-ocean animation. It is remembered on the device, including when skipped or refreshed mid-animation. Returning visits open the workspace directly. Reduced-motion preferences skip the opening; restricted local storage falls back to session storage.
+
 ## Styling
 
 Use **Appearance** in the header to choose a theme and a light, dark, or system mode. Changes apply immediately across the workspace and map without a reload or route recalculation. Preferences use browser localStorage and remain usable for the current session if storage is unavailable.
