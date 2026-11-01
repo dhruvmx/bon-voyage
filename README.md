@@ -9,7 +9,6 @@ React + Vite frontend, Python FastAPI backend, Neon PostgreSQL for Vercel, and S
 ## Start
 
 Requires Python 3.10+ and Node.js 20.19+ or 22.12+.
-
 ```sh
 python run.py
 ```
@@ -60,7 +59,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Collapsible, resizable desktop sidebar with remembered width, keyboard resizing, and independent scrolling on short screens. The page and sidebar use themed scrollbars.
 - Five workspace themes (Ocean, Forest, Walnut, Sandstone, Slate) with light, dark, and system modes. Appearance preferences persist on the device and sync across open tabs.
 
-The map, sea-lane network, and coastline data are bundled and work offline after installation. No live AIS or whale feed is connected. California habitat/slow-zone overlays are illustrative scenarios; global whale habitat coverage is **unassessed**, and international routes return `protection: null`, not an inferred perfect score. The UI, saved records, exports, and impact averages preserve that distinction. See [data coverage](backend/DATA.md).
+The map, sea-lane network, and coastline data are bundled and work offline after installation. No live AIS or whale feed is connected. Whale zones are bundled: the California overlays are illustrative scenarios, and `backend/whale_data/` holds an approximate, hand-drawn worldwide seed set of habitat and slow-speed polygons (seasonal zones apply by departure month). Every passage is scored against those **mapped zones only**; crossing none is not evidence of a whale-free route, so scores are scenario estimates, not safety assessments. Voyages saved before worldwide zones existed keep their original unassessed status, and the UI, saved records, exports, and impact averages preserve that distinction. Replace or extend the seed set with authoritative polygons using `python -m backend.import_zones`; see [data coverage](backend/DATA.md).
 
 ## Tests
 
@@ -104,13 +103,13 @@ Interactive API documentation: http://localhost:8000/docs
 
 `GET /api/catalog` includes `cargo_products`, `max_cargo_items`, `max_arrival_hours`, and `data_coverage`. Send an optional `cargo_items` array to `/api/plan` or voyage endpoints. Each item has a catalogue `product_id` (or `null` and a custom `name`), `weight` in tonnes, and optional `profile`, `temperature`, `shelf_life` and `cargo_age` in hours. Catalogue identity/profile is resolved server-side. The server rejects more than 10 items, duplicate names, invalid handling values, and total cargo over 100,000 tonnes. Legacy single-cargo requests remain valid.
 
-Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. The optimizer searches every candidate path at 0.01-knot open-water speed intervals within vessel limits. Protected transit speed is also optimized from 5 knots to the applicable cap (at most 10 knots), at 0.1-knot resolution. The arrival window is a maximum, with no waiting added. Results expose ETA, deadline slack, search metadata, and explicit infeasibility when even the fastest candidate is late. Identical path/speed options are labeled; `distinct_paths` reports the actual geometric count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
+Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, `active_zone_ids` (zones applying in the departure month), and top-level coverage metadata. `protection` is scored against the mapped zones; it is null only when no polygon layer is bundled. The optimizer searches every candidate path at 0.01-knot open-water speed intervals within vessel limits. Protected transit speed is also optimized from 5 knots to the applicable cap (at most 10 knots), at 0.1-knot resolution. The arrival window is a maximum, with no waiting added. Results expose ETA, deadline slack, search metadata, and explicit infeasibility when even the fastest candidate is late. Identical path/speed options are labeled; `distinct_paths` reports the actual geometric count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
 
 List endpoints return `{ items, total, limit, offset, has_more }`, with 20 items by default (maximum 100). Both accept `limit`, `offset` and `q`; voyage search covers the voyage name and cargo manifest. Voyage list items contain small card summaries, without coordinates, segments or full manifests. Fetch `GET /api/voyages/{id}` to edit or export the complete saved snapshot; `GET /api/vessels/{id}` resolves off-page vessel assignments. Fleet and voyage screens load additional pages on demand, while `/api/voyages/stats` supplies totals across the whole account. Session expiry prompts login, preserves the current draft, and restores its record/vessel association when the same account signs back in.
 
 Read requests and stateless route calculations time out after 30 seconds and support cancellation. Invalid successful response bodies produce a recoverable error. Writes are never automatically retried. Display names are trimmed before their length is validated; password whitespace is preserved.
 
-Departure timestamps require a timezone and a UTC year between 1900 and 2100; unsupported dates return validation errors. California habitat scoring uses absolute modeled exposure with a fixed reference, so open-water detours cannot dilute an unchanged habitat passage. See `backend/DATA.md` for the normalization.
+Departure timestamps require a timezone and a UTC year between 1900 and 2100; unsupported dates return validation errors. Habitat scoring uses absolute modeled exposure with a fixed reference, so open-water detours cannot dilute an unchanged habitat passage. See `backend/DATA.md` for the normalization.
 
 ## Structure
 
@@ -158,7 +157,10 @@ Recommended balance first avoids newly expired cargo, then minimizes the worst p
 Export voyage downloads a compact PDF voyage brief (no print dialog). It puts sailing time, estimated fuel, lowest perishable arrival quality and whale assessment first, followed by UTC schedule, vessel settings, a cargo table and short operator notes. A standard ten-item manifest fits one page; long labels or notes can continue on a second page. Geometry and internal model dictionaries are omitted. Missing assessments stay N/A and infeasible deadlines or low-quality cargo remain visible. Saved exports use stored passage results and current assigned-vessel specifications when available. PDF generation ships with the initial application bundle, so export does not request a versioned JavaScript chunk after a deployment.
 
 The navigation marker uses a north-facing vector arrow with a bearing matching the projected route line. Turns use the shortest rotation across north and respect reduced-motion settings. Layer redraws retain playback position and heading. `npm run test:heading` exercises turns during live playback, seeking, layer changes, arrival/rewind and phone layout.
+<<<<<<< HEAD
 
 Arrival allowance caps elapsed sailing time; it never adds waiting. The allowance editor shows the selected sailing estimate separately. Current route responses include unrounded segment fuel/CO2 and habitat model inputs, which drive dashboard totals. During edits, obsolete dashboard values clear until the matching plan returns. Legacy voyages retain a proportional segment-fuel fallback.
 
 The cargo dropdown closes after selection, selected rows have separate 44px remove controls, and fields fit narrow panels without nested scrolling. Numeric editing retains typed decimals before converting days to hours. Run `npm run test:cargo` for keyboard/touch-sized cargo editing, decimal precision, deadline and fuel consistency, and stale-response coverage.
+=======
+>>>>>>> eb458ec (added worldwide whale zones)

@@ -159,11 +159,12 @@ class OptimizerTests(unittest.TestCase):
         with self.assertRaises(ValueError): PlanInput(departure='2026-11-01T00:00:00Z',min_speed=25,max_speed=24)
         with self.assertRaises(ValueError): Vessel(name='Invalid carrier',min_speed=25,max_speed=24)
 
-    def test_international_speed_choices_preserve_unassessed_habitat(self):
+    def test_international_speed_choices_use_mapped_zone_assessment(self):
         result=self.plan(origin='shanghai',destination='singapore',arrival_window=168)
         for route in result['routes']:
-            self.assertTrue(route['feasible']); self.assertIsNone(route['protection'])
-            self.assertEqual(route['score_breakdown']['weights']['habitat'],0)
+            self.assertTrue(route['feasible']); self.assertTrue(route['whale_assessed'])
+            self.assertIsNotNone(route['protection'])
+            self.assertGreater(route['score_breakdown']['weights']['habitat'],0)
         self.assertLess(self.chosen(result,'direct')['hours'],168)
 
     def test_saved_vessel_limits_and_optimizer_snapshot(self):

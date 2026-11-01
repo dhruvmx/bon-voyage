@@ -788,8 +788,13 @@ export default function App() {
                   value={!currentPlan ? "—" : journey?.protection != null ? Math.round(journey.protection) : "N/A"}
                   unit={whaleAssessed(route, inputs) ? "/100" : ""}
                   sub={route && journey
+<<<<<<< HEAD
                     ? `${whaleAssessed(route, inputs) ? "Whole route · higher is better" : "No habitat data"}`
                     : whaleAssessed(route, inputs) ? "California estimate" : "Habitat coverage incomplete"}
+=======
+                    ? `${whaleAssessed(route, inputs) ? "Exposure to mapped zones · higher is better; partial coverage, not a safety probability" : "Habitat coverage incomplete; no score available"}`
+                    : whaleAssessed(route, inputs) ? "Mapped-zone estimate" : "Habitat coverage incomplete"}
+>>>>>>> eb458ec (added worldwide whale zones)
                   dark
                   icon={ShieldCheck}
                 />
@@ -1015,6 +1020,7 @@ export default function App() {
                     route={route}
                     routes={result?.routes || []}
                     zones={catalog.zones}
+                    activeZoneIds={result?.active_zone_ids}
                     color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"}
                     coverage={result?.data_coverage}
                     progress={progress}
@@ -1330,7 +1336,7 @@ export default function App() {
           <div className="info-box">
             <h3>What changes the route?</h3>
             <p>
-              Each item has a perishability model, weight, and handling values. The planner considers the most time-sensitive item as well as fuel use. Modeled California slow zones stay at or below 10 knots; worldwide habitat coverage is incomplete.
+              Each item has a perishability model, weight, and handling values. The planner considers the most time-sensitive item as well as fuel use. Mapped whale zones (an approximate, partial worldwide set plus the California scenario) stay at or below 10 knots, and seasonal zones apply by departure month. Areas with no mapped zone are unassessed, not whale-free.
             </p>
           </div>
           <p>
@@ -1870,7 +1876,7 @@ function Insights({ voyages, stats, onPlan }) {
           Fuel is calculated segment by segment from your vessel’s consumption
           at 18 knots, using a cubic speed model. Freshness responds to elapsed
           time, cargo age, temperature, and the shelf-life window. Whale
-          assessment reflects only the bundled California scenario zones. Unassessed international voyages are excluded from the average; missing habitat data does not mean a passage is safe. Mixed cargo freshness is weighted by mass; recommendations also consider the most time-sensitive item.
+          assessment reflects only the bundled mapped zones, which are approximate and incomplete. Voyages saved as unassessed are excluded from the average; a passage that crosses no mapped zone is not thereby safe. Mixed cargo freshness is weighted by mass; recommendations also consider the most time-sensitive item.
         </p>
       </div>
     </>

@@ -1,0 +1,1227 @@
+{
+ "type": "FeatureCollection",
+ "name": "whale_zones_seed",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-cape-cod-bay",
+    "name": "Cape Cod Bay right whale zone (approx.)",
+    "kind": "vsr",
+    "months": [
+     1,
+     2,
+     3,
+     4,
+     5
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -70.7,
+       41.67
+      ],
+      [
+       -70.7,
+       42.2
+      ],
+      [
+       -69.95,
+       42.2
+      ],
+      [
+       -69.95,
+       41.67
+      ],
+      [
+       -70.7,
+       41.67
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-great-south-channel",
+    "name": "Great South Channel right whale zone (approx.)",
+    "kind": "vsr",
+    "months": [
+     4,
+     5,
+     6,
+     7
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -69.0,
+       40.6
+      ],
+      [
+       -69.0,
+       42.5
+      ],
+      [
+       -69.8,
+       42.5
+      ],
+      [
+       -69.8,
+       40.6
+      ],
+      [
+       -69.0,
+       40.6
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-southeast-calving",
+    "name": "Southeast US right whale calving zone (approx.)",
+    "kind": "vsr",
+    "months": [
+     11,
+     12,
+     1,
+     2,
+     3,
+     4
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -81.35,
+       29.9
+      ],
+      [
+       -81.25,
+       31.4
+      ],
+      [
+       -80.6,
+       31.4
+      ],
+      [
+       -80.6,
+       29.9
+      ],
+      [
+       -81.35,
+       29.9
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-port-nynj",
+    "name": "New York / New Jersey approach (20 nm, approx.)",
+    "kind": "vsr",
+    "months": [
+     11,
+     12,
+     1,
+     2,
+     3,
+     4
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -73.85,
+       40.7831
+      ],
+      [
+       -73.7736,
+       40.778
+      ],
+      [
+       -73.6996,
+       40.7629
+      ],
+      [
+       -73.6302,
+       40.7383
+      ],
+      [
+       -73.5676,
+       40.7048
+      ],
+      [
+       -73.5136,
+       40.6636
+      ],
+      [
+       -73.47,
+       40.6159
+      ],
+      [
+       -73.438,
+       40.5632
+      ],
+      [
+       -73.4185,
+       40.507
+      ],
+      [
+       -73.4123,
+       40.4492
+      ],
+      [
+       -73.4193,
+       40.3914
+      ],
+      [
+       -73.4394,
+       40.3353
+      ],
+      [
+       -73.4718,
+       40.2828
+      ],
+      [
+       -73.5157,
+       40.2354
+      ],
+      [
+       -73.5697,
+       40.1945
+      ],
+      [
+       -73.6321,
+       40.1613
+      ],
+      [
+       -73.701,
+       40.1369
+      ],
+      [
+       -73.7744,
+       40.1219
+      ],
+      [
+       -73.85,
+       40.1169
+      ],
+      [
+       -73.9256,
+       40.1219
+      ],
+      [
+       -73.999,
+       40.1369
+      ],
+      [
+       -74.0679,
+       40.1613
+      ],
+      [
+       -74.1303,
+       40.1945
+      ],
+      [
+       -74.1843,
+       40.2354
+      ],
+      [
+       -74.2282,
+       40.2828
+      ],
+      [
+       -74.2606,
+       40.3353
+      ],
+      [
+       -74.2807,
+       40.3914
+      ],
+      [
+       -74.2877,
+       40.4492
+      ],
+      [
+       -74.2815,
+       40.507
+      ],
+      [
+       -74.262,
+       40.5632
+      ],
+      [
+       -74.23,
+       40.6159
+      ],
+      [
+       -74.1864,
+       40.6636
+      ],
+      [
+       -74.1324,
+       40.7048
+      ],
+      [
+       -74.0698,
+       40.7383
+      ],
+      [
+       -74.0004,
+       40.7629
+      ],
+      [
+       -73.9264,
+       40.778
+      ],
+      [
+       -73.85,
+       40.7831
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-port-delaware",
+    "name": "Delaware Bay approach (20 nm, approx.)",
+    "kind": "vsr",
+    "months": [
+     11,
+     12,
+     1,
+     2,
+     3,
+     4
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -75.0,
+       39.1131
+      ],
+      [
+       -74.9255,
+       39.108
+      ],
+      [
+       -74.8532,
+       39.0929
+      ],
+      [
+       -74.7855,
+       39.0683
+      ],
+      [
+       -74.7243,
+       39.0349
+      ],
+      [
+       -74.6717,
+       38.9937
+      ],
+      [
+       -74.6291,
+       38.946
+      ],
+      [
+       -74.5978,
+       38.8932
+      ],
+      [
+       -74.5788,
+       38.8371
+      ],
+      [
+       -74.5727,
+       38.7792
+      ],
+      [
+       -74.5795,
+       38.7214
+      ],
+      [
+       -74.5991,
+       38.6654
+      ],
+      [
+       -74.6308,
+       38.6129
+      ],
+      [
+       -74.6736,
+       38.5654
+      ],
+      [
+       -74.7263,
+       38.5245
+      ],
+      [
+       -74.7872,
+       38.4913
+      ],
+      [
+       -74.8545,
+       38.4669
+      ],
+      [
+       -74.9261,
+       38.4519
+      ],
+      [
+       -75.0,
+       38.4469
+      ],
+      [
+       -75.0739,
+       38.4519
+      ],
+      [
+       -75.1455,
+       38.4669
+      ],
+      [
+       -75.2128,
+       38.4913
+      ],
+      [
+       -75.2737,
+       38.5245
+      ],
+      [
+       -75.3264,
+       38.5654
+      ],
+      [
+       -75.3692,
+       38.6129
+      ],
+      [
+       -75.4009,
+       38.6654
+      ],
+      [
+       -75.4205,
+       38.7214
+      ],
+      [
+       -75.4273,
+       38.7792
+      ],
+      [
+       -75.4212,
+       38.8371
+      ],
+      [
+       -75.4022,
+       38.8932
+      ],
+      [
+       -75.3709,
+       38.946
+      ],
+      [
+       -75.3283,
+       38.9937
+      ],
+      [
+       -75.2757,
+       39.0349
+      ],
+      [
+       -75.2145,
+       39.0683
+      ],
+      [
+       -75.1468,
+       39.0929
+      ],
+      [
+       -75.0745,
+       39.108
+      ],
+      [
+       -75.0,
+       39.1131
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-port-chesapeake",
+    "name": "Chesapeake Bay approach (20 nm, approx.)",
+    "kind": "vsr",
+    "months": [
+     11,
+     12,
+     1,
+     2,
+     3,
+     4
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -75.95,
+       37.2831
+      ],
+      [
+       -75.8773,
+       37.278
+      ],
+      [
+       -75.8068,
+       37.2629
+      ],
+      [
+       -75.7408,
+       37.2383
+      ],
+      [
+       -75.6812,
+       37.2049
+      ],
+      [
+       -75.6298,
+       37.1637
+      ],
+      [
+       -75.5882,
+       37.116
+      ],
+      [
+       -75.5577,
+       37.0633
+      ],
+      [
+       -75.5392,
+       37.0071
+      ],
+      [
+       -75.5332,
+       36.9493
+      ],
+      [
+       -75.5398,
+       36.8915
+      ],
+      [
+       -75.5589,
+       36.8354
+      ],
+      [
+       -75.5898,
+       36.7829
+      ],
+      [
+       -75.6316,
+       36.7355
+      ],
+      [
+       -75.683,
+       36.6945
+      ],
+      [
+       -75.7424,
+       36.6613
+      ],
+      [
+       -75.808,
+       36.6369
+      ],
+      [
+       -75.8779,
+       36.6219
+      ],
+      [
+       -75.95,
+       36.6169
+      ],
+      [
+       -76.0221,
+       36.6219
+      ],
+      [
+       -76.092,
+       36.6369
+      ],
+      [
+       -76.1576,
+       36.6613
+      ],
+      [
+       -76.217,
+       36.6945
+      ],
+      [
+       -76.2684,
+       36.7355
+      ],
+      [
+       -76.3102,
+       36.7829
+      ],
+      [
+       -76.3411,
+       36.8354
+      ],
+      [
+       -76.3602,
+       36.8915
+      ],
+      [
+       -76.3668,
+       36.9493
+      ],
+      [
+       -76.3608,
+       37.0071
+      ],
+      [
+       -76.3423,
+       37.0633
+      ],
+      [
+       -76.3118,
+       37.116
+      ],
+      [
+       -76.2702,
+       37.1637
+      ],
+      [
+       -76.2188,
+       37.2049
+      ],
+      [
+       -76.1592,
+       37.2383
+      ],
+      [
+       -76.0932,
+       37.2629
+      ],
+      [
+       -76.0227,
+       37.278
+      ],
+      [
+       -75.95,
+       37.2831
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "us-port-morehead",
+    "name": "Morehead City / Beaufort approach (20 nm, approx.)",
+    "kind": "vsr",
+    "months": [
+     11,
+     12,
+     1,
+     2,
+     3,
+     4
+    ],
+    "source": "Hand-drawn approximation of a NOAA Fisheries right whale slow-speed area; verify against current regulations",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -76.6,
+       34.9331
+      ],
+      [
+       -76.5294,
+       34.928
+      ],
+      [
+       -76.4611,
+       34.9129
+      ],
+      [
+       -76.397,
+       34.8883
+      ],
+      [
+       -76.3391,
+       34.8549
+      ],
+      [
+       -76.2892,
+       34.8137
+      ],
+      [
+       -76.2488,
+       34.7661
+      ],
+      [
+       -76.2192,
+       34.7133
+      ],
+      [
+       -76.2012,
+       34.6572
+      ],
+      [
+       -76.1953,
+       34.5993
+      ],
+      [
+       -76.2017,
+       34.5415
+      ],
+      [
+       -76.2202,
+       34.4855
+      ],
+      [
+       -76.2502,
+       34.4329
+      ],
+      [
+       -76.2908,
+       34.3855
+      ],
+      [
+       -76.3407,
+       34.3445
+      ],
+      [
+       -76.3984,
+       34.3114
+      ],
+      [
+       -76.4621,
+       34.2869
+      ],
+      [
+       -76.53,
+       34.2719
+      ],
+      [
+       -76.6,
+       34.2669
+      ],
+      [
+       -76.67,
+       34.2719
+      ],
+      [
+       -76.7379,
+       34.2869
+      ],
+      [
+       -76.8016,
+       34.3114
+      ],
+      [
+       -76.8593,
+       34.3445
+      ],
+      [
+       -76.9092,
+       34.3855
+      ],
+      [
+       -76.9498,
+       34.4329
+      ],
+      [
+       -76.9798,
+       34.4855
+      ],
+      [
+       -76.9983,
+       34.5415
+      ],
+      [
+       -77.0047,
+       34.5993
+      ],
+      [
+       -76.9988,
+       34.6572
+      ],
+      [
+       -76.9808,
+       34.7133
+      ],
+      [
+       -76.9512,
+       34.7661
+      ],
+      [
+       -76.9108,
+       34.8137
+      ],
+      [
+       -76.8609,
+       34.8549
+      ],
+      [
+       -76.803,
+       34.8883
+      ],
+      [
+       -76.7389,
+       34.9129
+      ],
+      [
+       -76.6706,
+       34.928
+      ],
+      [
+       -76.6,
+       34.9331
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "ca-gulf-st-lawrence",
+    "name": "Gulf of St. Lawrence right whale zone (approx.)",
+    "kind": "vsr",
+    "months": [
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "source": "Hand-drawn approximation of a Transport Canada right whale slowdown area; verify against current measures",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -65.0,
+       47.0
+      ],
+      [
+       -64.0,
+       48.9
+      ],
+      [
+       -62.0,
+       49.6
+      ],
+      [
+       -60.0,
+       49.4
+      ],
+      [
+       -59.4,
+       47.6
+      ],
+      [
+       -61.0,
+       47.0
+      ],
+      [
+       -65.0,
+       47.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "ca-haro-strait",
+    "name": "Haro Strait / Boundary Pass killer whale area (approx.)",
+    "kind": "whale",
+    "months": [
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ],
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -123.3,
+       48.3
+      ],
+      [
+       -123.45,
+       48.55
+      ],
+      [
+       -123.35,
+       48.85
+      ],
+      [
+       -123.1,
+       48.95
+      ],
+      [
+       -123.0,
+       48.7
+      ],
+      [
+       -123.1,
+       48.4
+      ],
+      [
+       -123.3,
+       48.3
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "es-strait-of-gibraltar",
+    "name": "Strait of Gibraltar whale area (approx.)",
+    "kind": "whale",
+    "months": null,
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -6.1,
+       35.75
+      ],
+      [
+       -6.1,
+       36.2
+      ],
+      [
+       -5.3,
+       36.2
+      ],
+      [
+       -5.3,
+       35.75
+      ],
+      [
+       -6.1,
+       35.75
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "gr-hellenic-trench",
+    "name": "Hellenic Trench sperm whale area (approx.)",
+    "kind": "whale",
+    "months": null,
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       22.8,
+       35.4
+      ],
+      [
+       21.2,
+       35.4
+      ],
+      [
+       20.0,
+       36.6
+      ],
+      [
+       20.2,
+       37.6
+      ],
+      [
+       21.2,
+       37.6
+      ],
+      [
+       22.6,
+       36.8
+      ],
+      [
+       22.8,
+       35.4
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "lk-southern-blue-whale",
+    "name": "Southern Sri Lanka blue whale area (approx.)",
+    "kind": "whale",
+    "months": null,
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       79.8,
+       5.3
+      ],
+      [
+       81.7,
+       5.3
+      ],
+      [
+       81.7,
+       6.0
+      ],
+      [
+       79.8,
+       6.0
+      ],
+      [
+       79.8,
+       5.3
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "au-east-coast-humpback",
+    "name": "East Australia humpback migration corridor (approx.)",
+    "kind": "whale",
+    "months": [
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11
+    ],
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       149.95,
+       -37.0
+      ],
+      [
+       150.75,
+       -35.0
+      ],
+      [
+       151.28,
+       -33.9
+      ],
+      [
+       152.6,
+       -32.0
+      ],
+      [
+       153.2,
+       -30.0
+      ],
+      [
+       153.6,
+       -28.2
+      ],
+      [
+       154.4,
+       -28.2
+      ],
+      [
+       154.0,
+       -30.0
+      ],
+      [
+       153.4,
+       -32.0
+      ],
+      [
+       152.1,
+       -33.9
+      ],
+      [
+       151.55,
+       -35.0
+      ],
+      [
+       150.75,
+       -37.0
+      ],
+      [
+       149.95,
+       -37.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "nz-hauraki-gulf",
+    "name": "Hauraki Gulf Bryde's whale area (approx.)",
+    "kind": "whale",
+    "months": null,
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       174.7,
+       -37.0
+      ],
+      [
+       175.5,
+       -37.0
+      ],
+      [
+       175.8,
+       -36.1
+      ],
+      [
+       175.0,
+       -35.9
+      ],
+      [
+       174.65,
+       -36.3
+      ],
+      [
+       174.7,
+       -37.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "id": "pa-gulf-of-panama",
+    "name": "Gulf of Panama humpback area (approx.)",
+    "kind": "whale",
+    "months": [
+     7,
+     8,
+     9,
+     10
+    ],
+    "source": "Hand-drawn approximation of a published whale habitat / ship-strike area; not an official boundary",
+    "approximate": true
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       -80.5,
+       6.9
+      ],
+      [
+       -80.0,
+       8.6
+      ],
+      [
+       -79.2,
+       8.6
+      ],
+      [
+       -78.6,
+       8.2
+      ],
+      [
+       -78.8,
+       7.0
+      ],
+      [
+       -80.5,
+       6.9
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

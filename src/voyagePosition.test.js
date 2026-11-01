@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { positionAtProgress } from './voyagePosition.js';
+import { positionAtProgress, continuousHeading } from './voyagePosition.js';
 const route = {
   hours: 4.00001, coordinates: [[0,0],[0,10],[0,40]],
   segments: [{from:[0,0],to:[0,10],hours:1},{from:[0,10],to:[0,40],hours:3}],
@@ -23,6 +23,7 @@ test('zero-time segments, bounds and missing segments do not leave a stale posit
   assert.deepEqual(positionAtProgress({...route,segments:[]},100),[0,40]);
 });
 
+<<<<<<< HEAD
 test('projected direction matches east-west lines at high latitude and unwraps north turns', async () => {
   const { headingAtProgress, continuousHeading } = await import('./voyagePosition.js');
   const east = { segments: [{ from: [70, 0], to: [70, 90], hours: 1 }] };
@@ -31,4 +32,11 @@ test('projected direction matches east-west lines at high latitude and unwraps n
   assert.equal(continuousHeading(359, 1), 361);
   assert.equal(continuousHeading(1, 359), -1);
   assert.equal(continuousHeading(null, 45), 45);
+=======
+test('continuousHeading wraps cleanly across 0/360 boundary', () => {
+  assert.equal(continuousHeading(null, 45), 45);
+  assert.equal(continuousHeading(350, 10), 370);
+  assert.equal(continuousHeading(10, 350), -10);
+  assert.equal(continuousHeading(180, 185), 185);
+>>>>>>> eb458ec (added worldwide whale zones)
 });

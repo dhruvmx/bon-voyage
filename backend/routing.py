@@ -9,7 +9,12 @@ from threading import Lock
 from types import SimpleNamespace
 from .cargo_catalog import PRODUCT_BY_ID
 from .cargo_model import MODEL_VERSION, evaluate_cargo, product_model
+<<<<<<< HEAD
 from .optimizer import search_passages, OPTIMIZER_VERSION, HABITAT_REFERENCE_NM
+=======
+from .optimizer import search_passages, OPTIMIZER_VERSION
+from .zones import ZoneIndex, load_zones
+>>>>>>> eb458ec (added worldwide whale zones)
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -48,12 +53,21 @@ PORTS = [
     {"id":"sydney","name":"Sydney","code":"AUSYD","lat":-33.97,"lon":151.22},
     {"id":"auckland","name":"Auckland","code":"NZAKL","lat":-36.84,"lon":174.77},
 ]
-ZONES = [
+# Illustrative circular zones for the California scenario. Polygon zones for the
+# rest of the world come from backend/whale_data/whale_zones*.geojson (see zones.py).
+CALIFORNIA_ZONES = [
     {"id":"sb","name":"Santa Barbara Channel","lat":34.15,"lon":-119.8,"radius_nm":30,"kind":"whale"},
     {"id":"monterey","name":"Monterey migration corridor","lat":36.55,"lon":-122.25,"radius_nm":36,"kind":"whale"},
     {"id":"sf","name":"San Francisco approach VSR","lat":37.70,"lon":-122.65,"radius_nm":14,"kind":"vsr"},
     {"id":"lax","name":"Los Angeles approach VSR","lat":33.65,"lon":-118.38,"radius_nm":13,"kind":"vsr"},
 ]
+ZONES = CALIFORNIA_ZONES + load_zones()
+if len({zone["id"] for zone in ZONES}) != len(ZONES):
+    raise ValueError("Zone ids must be unique across the California scenario and backend/whale_data/whale_zones*.geojson")
+ZONE_INDEX = ZoneIndex(ZONES)
+# Without any polygon layer there is nothing to assess outside California; fall back to
+# "unassessed" rather than reporting a perfect score from missing data.
+HAS_WORLD_LAYER = any(zone.get("rings") for zone in ZONES)
 CARGOS = {
     "berries":{"name":"Fresh berries","level":"Ultra-perishable","temperature":2,"shelf":84,"decay":.23,"weights":[.62,.12,.26],"color":"#b95b3d"},
     "avocados":{"name":"Avocados / bananas","level":"Managed atmosphere","temperature":5,"shelf":336,"decay":.075,"weights":[.30,.35,.35],"color":"#617348"},
@@ -75,11 +89,12 @@ RESTRICTION_SETS = [[], ["suez"], ["panama"], ["malacca"]]
 _NETWORK_LOCK = Lock()
 DATA_COVERAGE = {
     "whale": {
-        "scope": "California scenario only",
-        "source": "Bundled illustrative California habitat and approach zones",
+        "scope": "Bundled mapped zones: an approximate worldwide seed set plus the California scenario",
+        "source": "Hand-drawn outlines in backend/whale_data/whale_zones*.geojson; the California circles are illustrative",
         "live": False,
         "global_reference": "https://www.marinemammalhabitat.org/imma-eatlas/",
-        "note": "Areas without habitat data are unassessed, not whale-free. The 10-knot zones are planning assumptions, not a global regulatory database.",
+        "zone_count": len(ZONES),
+        "note": "Only mapped zones are detected. A route that crosses none is not whale-free: coverage is partial, outlines are approximate, and seasonal zones apply by departure month. The 10-knot zones are planning assumptions, not a regulatory database.",
     },
     "routing": {"source": "searoute 1.6.0 maritime network", "navigation_ready": False},
 }
@@ -96,8 +111,8 @@ def distance(a,b):
     dl=math.radians(b[0]-a[0]); dn=math.radians(b[1]-a[1])
     return 3440.065*2*math.asin(min(1,math.sqrt(math.sin(dl/2)**2+math.cos(lat1)*math.cos(lat2)*math.sin(dn/2)**2)))
 
-def zone_at(point):
-    return next((z for z in ZONES if distance(point,[z['lat'],z['lon']])<=z['radius_nm']),None)
+def zone_at(point,month=None):
+    return ZONE_INDEX.zone_at(point,month)
 
 def dense(points,step=2.0,digits=None):
     result=[points[0]]
@@ -181,7 +196,11 @@ def cargo_outcomes(p,hours):
         outcomes.append(evaluate_cargo(item,model,hours))
     return outcomes
 
-def prepare_paths(paths,california):
+def prepare_paths(paths,california,month=None):
+    """Split each path at zone boundaries and classify every piece.
+
+    *month* (1-12) selects the seasonal zones that apply; None means all zones.
+    """
     unique=[]; seen=set()
     for path_id,coords in paths.items():
         signature=tuple(map(tuple,coords))
@@ -189,9 +208,11 @@ def prepare_paths(paths,california):
         seen.add(signature)
         segments=[]
         for a,b in zip(coords,coords[1:]):
-            zone=zone_at([(a[0]+b[0])/2,(a[1]+b[1])/2])
-            segments.append({'from':a,'to':b,'distance':distance(a,b),
-                'zone':zone['name'] if zone else None,'kind':zone['kind'] if zone else 'open'})
+            cuts=ZONE_INDEX.split_segment(a,b,month)
+            for start,end in zip(cuts,cuts[1:]):
+                zone=zone_at([(start[0]+end[0])/2,(start[1]+end[1])/2],month)
+                segments.append({'from':start,'to':end,'distance':distance(start,end),
+                    'zone':zone['name'] if zone else None,'kind':zone['kind'] if zone else 'open'})
         total=sum(segment['distance'] for segment in segments)
         protected=sum(segment['distance'] for segment in segments if segment['zone'])
         unique.append({'id':path_id,'name':PATH_LABELS.get(path_id,path_id) if california else f"Sea path {len(unique)+1}",
@@ -201,7 +222,7 @@ def prepare_paths(paths,california):
     return unique
 
 
-def materialize_route(candidate,mode,p,california,reference_fuel):
+def materialize_route(candidate,mode,p,assessed,reference_fuel):
     path=candidate['path']; hours=candidate['hours']; speed=candidate['speed']
     outcomes=cargo_outcomes(p,hours)
     total_weight=sum(item['weight'] for item in outcomes)
@@ -223,7 +244,7 @@ def materialize_route(candidate,mode,p,california,reference_fuel):
         'freshness':round(sum(item['freshness']*item['weight'] for item in outcomes)/total_weight,2),
         'fuel':round(candidate['fuel'],4),'co2':round(candidate['fuel']*3.114,4),
         'fuel_delta':round((candidate['fuel']/reference_fuel-1)*100,1),
-        'protection':round(candidate['protection'],1) if california else None,'whale_assessed':california,
+        'protection':round(candidate['protection'],1) if assessed else None,'whale_assessed':assessed,
         'cargo_results':outcomes,'worst_cargo_freshness':min(item['freshness'] for item in outcomes),
         'eta':(departure+timedelta(hours=hours)).astimezone(timezone.utc).isoformat(),
         'feasible':feasible,'slack_hours':round(p.arrival_window-hours,4),
@@ -240,23 +261,29 @@ def plan(p):
     ports={port['id']:port for port in PORTS}; origin=ports[p.origin]; dest=ports[p.destination]
     california=origin['id'] in CA_IDS and dest['id'] in CA_IDS
     geometry=california_paths(origin,dest) if california else world_paths(origin,dest)
-    paths=prepare_paths(geometry,california)
+    departure=datetime.fromisoformat(p.departure.replace('Z','+00:00'))
+    month=departure.astimezone(timezone.utc).month
+    # Every passage is scored against the mapped zones that apply in the departure
+    # month. Crossing none of them is not evidence that the passage is whale-free.
+    assessed=california or HAS_WORLD_LAYER
+    paths=prepare_paths(geometry,california,month)
     try:
-        choices,optimization=search_passages(paths,p,cargo_outcomes(p,0),california)
+        choices,optimization=search_passages(paths,p,cargo_outcomes(p,0),assessed)
     except ValueError as error:
         raise RoutePlanningError(str(error)) from error
-    rows=[materialize_route(choices[mode],mode,p,california,optimization['reference_fuel_tonnes'])
+    rows=[materialize_route(choices[mode],mode,p,assessed,optimization['reference_fuel_tonnes'])
           for mode in ['balanced','direct','eco']]
     for index,row in enumerate(rows):
         row['same_as']=next((prior['id'] for prior in rows[:index]
             if (prior['path_id'],prior['speed'],prior['protected_speed'])==(row['path_id'],row['speed'],row['protected_speed'])),None)
-    departure=datetime.fromisoformat(p.departure.replace('Z','+00:00'))
-    coverage={**DATA_COVERAGE,'whale':{**DATA_COVERAGE['whale'],'score_available':california,
-        'status':'scenario' if california else 'unassessed',
-        'summary':'California scenario estimate; not a live safety or compliance assessment.' if california else 'Whale habitat coverage is incomplete for this passage. No global safety score is available.'}}
+    active_ids=ZONE_INDEX.active_ids(month)
+    coverage={**DATA_COVERAGE,'whale':{**DATA_COVERAGE['whale'],'score_available':assessed,
+        'status':'scenario' if california else ('mapped-zones' if assessed else 'unassessed'),
+        'departure_month':month,'active_zone_count':len(active_ids),
+        'summary':'California scenario estimate; not a live safety or compliance assessment.' if california else ('Exposure to mapped whale zones active in the departure month. Coverage is partial and outlines are approximate, so a high score is not a safety guarantee.' if assessed else 'Whale habitat coverage is incomplete for this passage. No global safety score is available.')}}
     return {
         'routes':rows,'recommended':'balanced','status':optimization['status'],
-        'zones':ZONES,'data_mode':'California coastal planning scenario' if california else 'Global sea-lane planning (searoute network)',
+        'zones':ZONES,'active_zone_ids':active_ids,'data_mode':'California coastal planning scenario' if california else 'Global sea-lane planning (searoute network)',
         'data_coverage':coverage,'distinct_paths':len(paths),'cargo_model_version':MODEL_VERSION,
         'optimization':optimization,'deadline_hours':p.arrival_window,
         'deadline_at':(departure+timedelta(hours=p.arrival_window)).astimezone(timezone.utc).isoformat(),
