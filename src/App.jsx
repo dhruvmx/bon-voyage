@@ -788,13 +788,8 @@ export default function App() {
                   value={!currentPlan ? "—" : journey?.protection != null ? Math.round(journey.protection) : "N/A"}
                   unit={whaleAssessed(route, inputs) ? "/100" : ""}
                   sub={route && journey
-<<<<<<< HEAD
-                    ? `${whaleAssessed(route, inputs) ? "Whole route · higher is better" : "No habitat data"}`
-                    : whaleAssessed(route, inputs) ? "California estimate" : "Habitat coverage incomplete"}
-=======
                     ? `${whaleAssessed(route, inputs) ? "Exposure to mapped zones · higher is better; partial coverage, not a safety probability" : "Habitat coverage incomplete; no score available"}`
                     : whaleAssessed(route, inputs) ? "Mapped-zone estimate" : "Habitat coverage incomplete"}
->>>>>>> eb458ec (added worldwide whale zones)
                   dark
                   icon={ShieldCheck}
                 />

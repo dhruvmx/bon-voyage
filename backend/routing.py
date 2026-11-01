@@ -9,12 +9,8 @@ from threading import Lock
 from types import SimpleNamespace
 from .cargo_catalog import PRODUCT_BY_ID
 from .cargo_model import MODEL_VERSION, evaluate_cargo, product_model
-<<<<<<< HEAD
 from .optimizer import search_passages, OPTIMIZER_VERSION, HABITAT_REFERENCE_NM
-=======
-from .optimizer import search_passages, OPTIMIZER_VERSION
 from .zones import ZoneIndex, load_zones
->>>>>>> eb458ec (added worldwide whale zones)
 from datetime import datetime, timedelta, timezone
 
 try:

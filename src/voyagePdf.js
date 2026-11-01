@@ -109,11 +109,7 @@ export function buildVoyagePdf(data) {
   for (let page = 1; page <= count; page++) {
     doc.setPage(page); rule(273);
     text('Planning estimates, not live telemetry or a food-safety assessment. The 70% target is application policy.', 18, 279, 6.8, C.muted);
-<<<<<<< HEAD
-    text(route.protection == null ? 'Whale habitat coverage incomplete; no assessment available.' : 'Whale assessment uses the bundled California scenario; it is not a safety probability.', 18, 283, 6.8, C.muted);
-=======
     text(route.protection == null ? 'Whale habitat coverage incomplete; no assessment available.' : 'Whale assessment covers bundled mapped zones only (approximate, partial); it is not a safety probability.', 18, 283, 6.8, C.muted);
->>>>>>> eb458ec (added worldwide whale zones)
     text('BON VOYAGE  /  Voyage brief', 18, 291, 7, C.accent, true);
     text(`${page} / ${count}`, 180, 291, 7, C.muted);
   }
