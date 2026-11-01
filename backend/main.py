@@ -77,6 +77,9 @@ def session(response,user_id):
         c.execute('INSERT INTO sessions VALUES(?,?,?)',(hashlib.sha256(token.encode()).hexdigest(),user_id,time.time()+7*86400))
     response.set_cookie('tideway_session',token,httponly=True,secure=SECURE,samesite='lax',max_age=7*86400,path='/')
 
+def trim_display_text(value):
+    return value.strip() if isinstance(value,str) else value
+
 class Credentials(BaseModel):
     email:str=Field(min_length=3,max_length=254)
     password:str=Field(min_length=1,max_length=128)
@@ -89,10 +92,12 @@ class Credentials(BaseModel):
 class Signup(Credentials):
     name:str=Field(min_length=2,max_length=80)
     company:str=Field(default='',max_length=120)
+    _trim=field_validator('name','company',mode='before')(trim_display_text)
 class Profile(BaseModel):
     name:str=Field(min_length=2,max_length=80)
     company:str=Field(default='',max_length=120)
     role:str=Field(default='Fleet operator',min_length=2,max_length=80)
+    _trim=field_validator('name','company','role',mode='before')(trim_display_text)
 class PasswordChange(BaseModel):
     current_password:str=Field(min_length=1,max_length=128)
     new_password:str=Field(min_length=8,max_length=128)
@@ -219,6 +224,7 @@ def safe_plan(p):
 def calculate(p:PlanInput): return safe_plan(p)
 
 class Vessel(BaseModel):
+    _trim=field_validator('name','imo',mode='before')(trim_display_text)
     name:str=Field(min_length=2,max_length=100)
     imo:str=Field(default='',max_length=7)
     max_speed:float=Field(default=24,ge=5,le=35)
@@ -236,6 +242,7 @@ class Vessel(BaseModel):
         if v and not re.fullmatch(r'\d{7}',v): raise ValueError('IMO must be seven digits or blank.')
         return v
 class Voyage(BaseModel):
+    _trim=field_validator('name',mode='before')(trim_display_text)
     name:str=Field(min_length=2,max_length=120)
     vessel_id:str|None=None
     notes:str=Field(default='',max_length=3000)

@@ -323,6 +323,7 @@ export default function VoyageMap({
           className="small-button"
           onClick={() => setShowLayers(!showLayers)}
           aria-expanded={showLayers}
+          aria-label="Map layers"
         >
           <Layers size={14} /> Map layers
         </button>

@@ -111,3 +111,25 @@ class ReviewGapTests(unittest.TestCase):
         response=self.client.post('/api/plan',json={'departure':'2026-11-01T00:00:00Z',
             'weight':.001,'fuel_per_day':.001,'shelf_life':.001,'temperature':40})
         self.assertEqual(response.status_code,200,response.text)
+
+    def test_display_names_are_trimmed_before_length_validation(self):
+        for path,body in [
+            ('/api/auth/signup',{'name':'  ','email':'blank@example.com','password':'password-123'}),
+            ('/api/auth/signup',{'name':' A ','email':'short@example.com','password':'password-123'}),
+        ]:
+            self.assertEqual(self.client.post(path,json=body).status_code,422)
+        self.signup()
+        self.assertEqual(self.client.post('/api/vessels',json={'name':'  '}).status_code,422)
+        self.assertEqual(self.client.put('/api/profile',json={'name':'Valid name','role':'  '}).status_code,422)
+        self.assertEqual(self.client.post('/api/voyages',json={'name':'  ','inputs':{'departure':'2026-11-01T00:00:00Z'}}).status_code,422)
+        vessel=self.client.post('/api/vessels',json={'name':'  Valid vessel  ','imo':' 1234567 '}).json()
+        self.assertEqual(vessel['name'],'Valid vessel'); self.assertEqual(vessel['imo'],'1234567')
+        profile=self.client.put('/api/profile',json={'name':'  Valid name  ','company':'  Fleet  ','role':'  Captain  '}).json()
+        self.assertEqual(profile['name'],'Valid name'); self.assertEqual(profile['role'],'Captain')
+        self.assertEqual(self.client.get('/api/auth/me').json(),profile)
+        self.client.post('/api/auth/logout')
+        password='  spaced-password  '
+        self.assertEqual(self.client.post('/api/auth/signup',json={'name':'Spaced Password','email':'spaces@example.com','password':password}).status_code,201)
+        self.client.post('/api/auth/logout')
+        self.assertEqual(self.client.post('/api/auth/login',json={'email':'spaces@example.com','password':password.strip()}).status_code,401)
+        self.assertEqual(self.client.post('/api/auth/login',json={'email':'spaces@example.com','password':password}).status_code,200)

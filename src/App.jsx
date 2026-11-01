@@ -27,11 +27,12 @@ import { api, download, getSessionVersion } from "./api";
 import VoyageMap from "./Map";
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
+import WorkspaceSearch from "./WorkspaceSearch";
 import Intro from "./Intro";
 import { shouldShowIntro } from "./intro";
 import SidebarControls from "./SidebarControls";
 import CargoPicker from "./CargoPicker";
-import { cargoItems, manifestInputs, manifestError, whaleAssessed, formatHours, formatDuration } from "./cargo";
+import { cargoItems, manifestInputs, manifestError, MAX_CARGO_ITEMS, whaleAssessed, formatHours, formatDuration } from "./cargo";
 
 const freshInputs = () => ({
   origin: "la",
@@ -170,7 +171,7 @@ export default function App() {
     [notes, setNotes] = useState(""),
     [voyageStatus, setVoyageStatus] = useState("Planned");
   const [saving, setSaving] = useState(false);
-  const draftVersion = useRef(0), saveOperation = useRef(0);
+  const draftVersion = useRef(0), saveOperation = useRef(0), vesselSelection = useRef(0);
   const invalidateDraftRequests = useCallback(() => {
     ++draftVersion.current; ++saveOperation.current; setSaving(false);
   }, []);
@@ -188,15 +189,22 @@ export default function App() {
     [loadingMore, setLoadingMore] = useState("");
   const listRequest = useRef(0), account = useRef(null), assignedVessel = useRef(""), expiredDraft = useRef(null), paging = useRef(false);
   account.current = user?.id; assignedVessel.current = vesselId;
-  const [modal, setModal] = useState(null),
+  const [modal, setModalState] = useState(null),
     [authMode, setAuthMode] = useState("signup"),
     [toast, setToast] = useState(""),
     [dataError, setDataError] = useState(""),
     [progress, setProgress] = useState(0),
     [playing, setPlaying] = useState(false),
     [query, setQuery] = useState("");
+  const modalVersion = useRef(0), pendingRemovals = useRef(new Set()), editingRecord = useRef(null);
+  editingRecord.current = editingId;
+  const [removingIds, setRemovingIds] = useState([]);
+  const setModal = useCallback((next) => {
+    ++modalVersion.current;
+    setModalState(next);
+  }, []);
   const [introState, setIntroState] = useState(() => shouldShowIntro() ? "playing" : "done");
-  const closeModal = useCallback(() => setModal(null), []),
+  const closeModal = useCallback(() => setModal(null), [setModal]),
     requestNo = useRef(0),
     desiredRoute = useRef(null),
     toastTimer = useRef(null);
@@ -270,18 +278,19 @@ export default function App() {
   }
   useEffect(() => {
     let active = true;
-    api("/catalog")
+    const controller = new AbortController();
+    api("/catalog", { signal: controller.signal })
       .then((x) => active && setCatalog(x))
       .catch((e) => active && setPlanError(e.message));
     const startupSession = getSessionVersion();
-    api("/auth/me")
+    api("/auth/me", { signal: controller.signal })
       .then((x) => active && startupSession === getSessionVersion() && setUser(x))
       .catch((e) => {
         if (e.status !== 401 && active) setDataError(e.message);
       })
       .finally(() => active && setAuthChecked(true));
     return () => {
-      active = false;
+      active = false; controller.abort();
     };
   }, []);
   useEffect(() => {
@@ -303,11 +312,12 @@ export default function App() {
       ++requestNo.current; setPlanError(cargoError); setResult(null); setCalculating(false); return;
     }
     const n = ++requestNo.current;
+    const controller = new AbortController();
     setCalculating(true);
     setPlanError("");
     const timer = setTimeout(
       () =>
-        api("/plan", { method: "POST", body: inputs })
+        api("/plan", { method: "POST", body: inputs, signal: controller.signal })
           .then((x) => {
             if (n === requestNo.current) {
               setResult(x);
@@ -326,7 +336,7 @@ export default function App() {
           }),
       300,
     );
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [inputs, catalog, manifest]);
   useEffect(() => {
     setProgress(0);
@@ -414,6 +424,7 @@ export default function App() {
     setQuery("");
   };
   const useVessel = (id) => {
+    ++vesselSelection.current;
     setVesselId(id);
     const v = vessels.find((x) => x.id === id);
     if (v)
@@ -473,7 +484,7 @@ export default function App() {
     e.preventDefault();
     if (!route || saving) return;
     const owner = account.current, draft = draftVersion.current;
-    const session = getSessionVersion(), operation = ++saveOperation.current;
+    const session = getSessionVersion(), operation = ++saveOperation.current, dialog = modalVersion.current;
     const isCurrent = () => owner === account.current && draft === draftVersion.current && session === getSessionVersion() && operation === saveOperation.current;
     setSaving(true);
     setDataError("");
@@ -493,7 +504,7 @@ export default function App() {
       setEditingId(saved.id);
       await refresh();
       if (!isCurrent()) return;
-      setModal((previous) => previous === "save" ? null : previous);
+      if (dialog === modalVersion.current) setModal(null);
       notify(editingId ? "Voyage updated." : "Voyage saved to your account.");
     } catch (err) {
       if (isCurrent()) setDataError(err.message);
@@ -502,19 +513,103 @@ export default function App() {
     }
   }
   async function removeRecord(type, id) {
+    if (pendingRemovals.current.has(id)) return;
+    const dialog = modalVersion.current, owner = account.current;
+    const session = getSessionVersion();
+    const isOwner = () => owner === account.current && session === getSessionVersion();
+    pendingRemovals.current.add(id); setRemovingIds((previous) => [...previous, id]);
     try {
       await api("/" + type + "/" + id, { method: "DELETE" });
+      if (!isOwner()) return;
       await refresh();
-      if (type === "voyages" && editingId === id) setEditingId(null);
+      if (!isOwner()) return;
+      if (type === "voyages" && editingRecord.current === id) {
+        invalidateDraftRequests(); setEditingId(null);
+      }
       notify(type === "voyages" ? "Voyage deleted." : "Vessel removed.");
-      setModal(null);
+      if (dialog === modalVersion.current) setModal(null);
     } catch (e) {
-      setDataError(e.message);
+      if (isOwner() && dialog === modalVersion.current) setDataError(e.message);
+    } finally {
+      pendingRemovals.current.delete(id);
+      setRemovingIds((previous) => previous.filter((record) => record !== id));
     }
   }
   const selectedVessel = vessels.find((v) => v.id === vesselId),
     capacityError = selectedVessel && inputs.weight > selectedVessel.capacity;
   const ready = route && !calculating && !planError && !capacityError;
+  function openSaveDialog() {
+    if (!ready) { notify("Wait for a valid passage before saving."); return; }
+    if (requireAuth()) {
+      setDataError("");
+      if (!voyageName) setVoyageName(`${manifest.length > 1 ? `${manifest.length} cargo items` : inputs.cargo_name} · ${catalog.ports.find((p) => p.id === inputs.destination)?.name || inputs.destination}`.slice(0, 120));
+      setModal("save");
+    }
+  }
+  function revealPlanner(selector, focusSelector) {
+    switchView("planner");
+    requestAnimationFrame(() => {
+      const target = document.querySelector(selector);
+      if (!target) return;
+      if (target.tagName === "DETAILS") target.open = true;
+      target.scrollIntoView({ block: "center", behavior: "auto" });
+      target.querySelector(focusSelector || "summary, input, select, button")?.focus({ preventScroll: true });
+    });
+  }
+  async function searchAction(item) {
+    if (item.kind === "voyage") { loadVoyage(item.item); return; }
+    if (item.kind === "vessel") {
+      const owner = account.current, session = getSessionVersion(), draft = draftVersion.current, selection = ++vesselSelection.current;
+      try {
+        const ship = await api(`/vessels/${item.item.id}`);
+        if (owner !== account.current || session !== getSessionVersion() || draft !== draftVersion.current || selection !== vesselSelection.current) return;
+        setVessels((previous) => [...previous.filter((v) => v.id !== ship.id), ship]);
+        setVesselId(ship.id);
+        setInputs((previous) => ({ ...previous, max_speed: ship.max_speed, min_speed: ship.min_speed, fuel_per_day: ship.fuel_per_day }));
+        revealPlanner("details.advanced"); notify(`${ship.name} assigned to this passage.`);
+      } catch (e) { if (owner === account.current && session === getSessionVersion() && selection === vesselSelection.current) setDataError(e.message); }
+      return;
+    }
+    if (item.kind === "port") {
+      setInputs((previous) => {
+        const other = item.field === "origin" ? "destination" : "origin";
+        return { ...previous, [item.field]: item.value, [other]: previous[other] === item.value ? previous[item.field] : previous[other] };
+      });
+      revealPlanner(".port-pickers", `label:nth-of-type(${item.field === "origin" ? 1 : 2}) select`);
+      return;
+    }
+    if (item.kind === "cargo") {
+      const product = item.product;
+      if (manifest.some((cargo) => cargo.product_id === product.id || cargo.name.toLowerCase() === product.name.toLowerCase())) notify(`${product.name} is already in your manifest.`);
+      else if (manifest.length >= MAX_CARGO_ITEMS) notify("Your manifest is full. Remove an item before adding another.");
+      else {
+        setInputs((previous) => manifestInputs(previous, [...cargoItems(previous), { product_id: product.id, name: product.name, profile: product.profile, weight: 10, temperature: product.temperature, shelf_life: product.shelf_life, cargo_age: 0, routing_priority: "auto" }]));
+        notify(`${product.name} added to the manifest.`);
+      }
+      revealPlanner(".cargo-editor"); return;
+    }
+    const [action, value] = item.id.split(":");
+    if (["planner", "voyages", "fleet", "insights", "profile"].includes(action)) { switchView(action); return; }
+    if (action === "new") { newVoyage(); return; }
+    const panels = { cargo: ".cargo-editor", deadline: ".deadline-editor", advanced: "details.advanced", compare: ".compare-disclosure", report: ".planner-report", map: ".map-panel", coverage: ".coverage-note" };
+    if (panels[action]) { revealPlanner(panels[action]); return; }
+    if (action === "layers") { revealPlanner(".map-panel"); requestAnimationFrame(() => { if (!document.querySelector(".layer-menu")) document.querySelector('[aria-label="Map layers"]')?.click(); }); return; }
+    if (action === "save") { openSaveDialog(); return; }
+    if (action === "export") {
+      if (ready) download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at });
+      else notify("Wait for a valid passage before exporting.");
+      return;
+    }
+    if (["appearance", "theme", "mode"].includes(action)) {
+      const panel = document.getElementById("appearance-panel"); panel?.showPopover();
+      if (value) { panel?.querySelector(`input[name="workspace-${action}"][value="${value}"]`)?.click(); panel?.hidePopover(); }
+      return;
+    }
+    if (action === "help") setModal("help");
+    if (action === "add-vessel" && requireAuth()) setModal({ type: "vessel", item: null });
+    if (action === "login" || action === "signup") { setAuthMode(action); setModal("auth"); }
+  }
+  const renderedModalVersion = modalVersion.current;
   return (
     <>
       <aside className="sidebar" inert={introState === "playing"}>
@@ -591,9 +686,10 @@ export default function App() {
             </b>
           </div>
           <div className="header-actions">
+            <WorkspaceSearch catalog={catalog} user={user} blocked={Boolean(modal) || introState === "playing"} onAction={searchAction} />
             <Appearance />
             <button
-              className="icon-button"
+              className="icon-button header-help"
               aria-label="How Bon Voyage works"
               onClick={() => setModal("help")}
             >
@@ -917,16 +1013,7 @@ export default function App() {
                     <button
                       className="button full"
                       disabled={!ready}
-                      onClick={() => {
-                        if (requireAuth()) {
-                          setDataError("");
-                          if (!voyageName)
-                            setVoyageName(
-                              `${manifest.length > 1 ? `${manifest.length} cargo items` : inputs.cargo_name} · ${catalog.ports.find((p) => p.id === inputs.destination).name}`.slice(0, 120),
-                            );
-                          setModal("save");
-                        }
-                      }}
+                      onClick={openSaveDialog}
                     >
                       {calculating
                         ? "Calculating passage…"
@@ -1069,6 +1156,7 @@ export default function App() {
                   <Search size={15} />
                   <input
                     aria-label="Search voyages"
+                    maxLength={100}
                     placeholder="Search your voyages…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -1260,7 +1348,8 @@ export default function App() {
           onClose={closeModal}
           onSuccess={(u) => {
             const draft = expiredDraft.current; expiredDraft.current = null;
-            account.current = u.id; setUser(u); setModal(null);
+            account.current = u.id; setUser(u);
+            if (renderedModalVersion === modalVersion.current) setModal(null);
             if (draft?.owner === u.id) {
               setEditingId(draft.editingId);
               if (draft.vesselId) api(`/vessels/${draft.vesselId}`).then((ship) => {
@@ -1358,15 +1447,17 @@ export default function App() {
           item={modal.item}
           onClose={closeModal}
           onSave={async (data) => {
+            const dialog = renderedModalVersion, owner = account.current, session = getSessionVersion();
+            const isOwner = () => owner === account.current && session === getSessionVersion();
             await api("/vessels" + (modal.item ? "/" + modal.item.id : ""), {
               method: modal.item ? "PUT" : "POST",
               body: data,
             });
+            if (!isOwner()) return;
             await refresh();
-            setModal(null);
-            notify(
-              "Vessel " + (modal.item ? "updated." : "added to your fleet."),
-            );
+            if (!isOwner()) return;
+            if (dialog === modalVersion.current) setModal(null);
+            notify(`Vessel “${data.name.trim()}” saved.`);
           }}
         />
       )}
@@ -1391,9 +1482,10 @@ export default function App() {
             </button>
             <button
               className="button danger"
+              disabled={removingIds.includes(modal.item.id)}
               onClick={() => removeRecord(modal.record, modal.item.id)}
             >
-              Remove
+              {removingIds.includes(modal.item.id) ? "Removing…" : "Remove"}
             </button>
           </div>
         </Modal>

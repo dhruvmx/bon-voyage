@@ -14,7 +14,7 @@ Requires Python 3.10+ and Node.js 20.19+ or 22.12+.
 python run.py
 ```
 
-On Windows, double-click `Start-Bon-Voyage.cmd` if Python Launcher is installed. The launcher creates an isolated environment, installs dependencies, builds React, and starts Python. Open **http://localhost:8000**. Stop with Ctrl+C.
+On Windows, double-click `Start-Bon-Voyage.cmd` if Python Launcher is installed. The launcher creates an isolated environment, installs dependencies, builds React, and starts Python. It resynchronizes changed dependency manifests and rebuilds after nested source or asset edits; `PORT` also updates the printed URL. Open **http://localhost:8000**. Stop with Ctrl+C.
 
 ## Manual setup
 
@@ -80,9 +80,11 @@ Browser regressions cover delayed saves, renewed sessions, genuine expiry, and p
 BON_VOYAGE_DB=/tmp/bon-voyage-browser.sqlite3 python -m uvicorn backend.main:app --port 8001
 ```
 
-Run `npm run test:browser` in a second terminal. These checks create unique test accounts and voyages in that test database. `BON_VOYAGE_TEST_URL` overrides the local URL; `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing Chromium executable.
+Run `npm run test:browser` in a second terminal. `npm run test:dialogs` checks delayed vessel saves/deletions, edit-target preservation, duplicate-delete prevention, and recovery from malformed responses. These checks create unique test accounts and voyages in that test database. `BON_VOYAGE_TEST_URL` overrides the local URL; `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing Chromium executable.
 
 API numeric minimums are 0.001 hours for shelf life, 0.001 tonnes for cargo weight, and 0.001 tonnes/day for consumption. Smaller values return validation errors before calculations.
+
+GitHub Actions runs the backend tests, frontend tests, production build, and browser suites on pull requests and pushes to `main`. A disposable PostgreSQL service exercises the real storage adapter, JSON summary/search queries, impact totals, snapshots, and account isolation. Locally, set `BON_VOYAGE_TEST_POSTGRES_URL` to a test PostgreSQL database to enable that integration test; it creates and removes only a uniquely named test schema. Without the variable, that test is skipped and the SQLite suite still runs.
 
 ## API
 
@@ -105,6 +107,8 @@ Interactive API documentation: http://localhost:8000/docs
 Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. The optimizer searches every candidate path at 0.01-knot open-water speed intervals within vessel limits. Protected transit speed is also optimized from 5 knots to the applicable cap (at most 10 knots), at 0.1-knot resolution. The arrival window is a maximum, with no waiting added. Results expose ETA, deadline slack, search metadata, and explicit infeasibility when even the fastest candidate is late. Identical path/speed options are labeled; `distinct_paths` reports the actual geometric count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
 
 List endpoints return `{ items, total, limit, offset, has_more }`, with 20 items by default (maximum 100). Both accept `limit`, `offset` and `q`; voyage search covers the voyage name and cargo manifest. Voyage list items contain small card summaries, without coordinates, segments or full manifests. Fetch `GET /api/voyages/{id}` to edit or export the complete saved snapshot; `GET /api/vessels/{id}` resolves off-page vessel assignments. Fleet and voyage screens load additional pages on demand, while `/api/voyages/stats` supplies totals across the whole account. Session expiry prompts login, preserves the current draft, and restores its record/vessel association when the same account signs back in.
+
+Read requests and stateless route calculations time out after 30 seconds and support cancellation. Invalid successful response bodies produce a recoverable error. Writes are never automatically retried. Display names are trimmed before their length is validated; password whitespace is preserved.
 
 Departure timestamps require a timezone and a UTC year between 1900 and 2100; unsupported dates return validation errors. California habitat scoring uses absolute modeled exposure with a fixed reference, so open-water detours cannot dilute an unchanged habitat passage. See `backend/DATA.md` for the normalization.
 
@@ -138,3 +142,9 @@ Production storage adapter: backend/database.py. Neon uses psycopg with pooled c
 
 
 
+
+## Workspace search
+
+Use the header search button or Ctrl/Cmd+K to find features, every supported port, and all cargo products. Suggestions update as you type; use the arrow keys and Enter, or select a result directly. Port suggestions explicitly set departure or destination; cargo suggestions add products without duplicates and respect the 10-item limit. Feature results open the appropriate controls, including appearance, route comparison, exports, and custom cargo. Escape closes search.
+
+Signed-in users can also search all their saved voyages and vessels. Server-side search is debounced and cancellable, with more-results controls for paginated matches. Selecting a voyage loads its complete saved data; selecting a vessel assigns its current specifications. Account changes and expired sessions dismiss search and clear its private results. Run `npm run test:search` against the isolated browser test server for live suggestions, keyboard actions, pagination, stale responses, and 320–1440px layouts.

@@ -5,48 +5,64 @@ const sessionActions = new Set(["/auth/login", "/auth/signup", "/auth/logout", "
 
 export async function api(path, options = {}) {
   const requestSession = sessionVersion;
-  let response;
+  const method = (options.method || "GET").toUpperCase();
+  // Bound reads and stateless planning. Never automatically retry a write:
+  // a lost response can still belong to a successfully committed operation.
+  const { timeoutMs = method === "GET" || path === "/plan" ? 30000 : 0, signal, ...request } = options;
+  const controller = new AbortController();
+  let timedOut = false;
+  const cancel = () => controller.abort();
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
+  const timer = timeoutMs > 0 ? setTimeout(() => { timedOut = true; cancel(); }, timeoutMs) : null;
+  const transportError = () => new Error(timedOut
+    ? "The request timed out. Please try again."
+    : controller.signal.aborted ? "Request cancelled."
+      : "Cannot reach the Python backend. Check that the server is running and try again.");
   try {
-    response = await fetch("/api" + path, {
-      credentials: "same-origin",
-      ...options,
-      headers: { "Content-Type": "application/json", ...options.headers },
-      body:
-        options.body === undefined ? undefined : JSON.stringify(options.body),
-    });
-  } catch {
-    throw new Error(
-      "Cannot reach the Python backend. Check that the server is running and try again.",
-    );
-  }
-  const data = await response.json().catch(() => null);
-  if (!response.ok) {
-    const staleSession = requestSession !== sessionVersion;
-    if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/me"].includes(path)) {
-      ++sessionVersion;
-      window.dispatchEvent(new Event("bon-voyage-session-expired"));
+    let response;
+    try {
+      response = await fetch("/api" + path, {
+        credentials: "same-origin", ...request, signal: controller.signal,
+        headers: { "Content-Type": "application/json", ...request.headers },
+        body: request.body === undefined ? undefined : JSON.stringify(request.body),
+      });
+    } catch { throw transportError(); }
+    let data;
+    try { data = await response.json(); }
+    catch {
+      if (controller.signal.aborted) throw transportError();
+      data = null;
     }
-    const detail = data?.detail;
-    const error = new Error(
-      Array.isArray(detail)
+    if (!response.ok) {
+      const staleSession = requestSession !== sessionVersion;
+      if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/me"].includes(path)) {
+        ++sessionVersion;
+        window.dispatchEvent(new Event("bon-voyage-session-expired"));
+      }
+      const detail = data?.detail;
+      const error = new Error(Array.isArray(detail)
         ? detail.map((x) => `${x.loc.at(-1)}: ${x.msg}`).join(" · ")
-        : detail || `Request failed (${response.status}).`,
-    );
-    error.status = response.status;
-    error.staleSession = staleSession;
-    throw error;
+        : detail || `Request failed (${response.status}).`);
+      error.status = response.status;
+      error.staleSession = staleSession;
+      throw error;
+    }
+    if (data === null || typeof data !== "object") {
+      throw new Error("The server returned an invalid response. Please try again.");
+    }
+    if (sessionActions.has(path)) ++sessionVersion;
+    return data;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", cancel);
   }
-  if (sessionActions.has(path)) ++sessionVersion;
-  return data;
 }
 export function download(data, filename = "bon-voyage.json") {
-  const url = URL.createObjectURL(
-    new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-  );
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-

@@ -141,7 +141,7 @@ class OptimizerTests(unittest.TestCase):
         from fastapi.testclient import TestClient
         from backend import main
         original=main.DB
-        with tempfile.TemporaryDirectory(dir=main.ROOT/'data') as directory:
+        with tempfile.TemporaryDirectory() as directory:
             main.DB=Path(directory)/'optimizer.sqlite3'
             try:
                 main.init_db()
