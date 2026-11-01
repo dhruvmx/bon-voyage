@@ -447,7 +447,6 @@ html.intro-active { scrollbar-gutter: auto; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .route-highlight { animation: none; } }
 @media (max-width: 1100px) { .passage-preview .route-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
-<<<<<<< HEAD
 /* Dynamic loading & skeleton for Route Map */
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -592,7 +591,7 @@ html.intro-active { scrollbar-gutter: auto; overflow: hidden; }
     animation: none !important;
   }
 }
-=======
+
 /* Planner overview: primary inputs and map first, deeper analysis on demand. */
 .planner-page .page-title { margin-bottom: 24px; }
 .planner-page .page-title h1 { font-size: clamp(30px, 3vw, 40px); }
@@ -704,4 +703,7 @@ dialog.workspace-search > .workspace-search-empty { padding: 24px 20px; margin: 
 }
 
 .workspace-search-clear { min-height: 44px; font-size: 12px; }
->>>>>>> b213d59974a1f193e9b13f467743d1a1a87afa63
+
+.voyage-dashboard { margin-bottom: 28px; }
+.voyage-dashboard > h2 { font-size: 16px; margin-bottom: 14px; }
+.voyage-dashboard > .stats { margin-bottom: 0; }
