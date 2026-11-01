@@ -446,3 +446,54 @@ html.intro-active { scrollbar-gutter: auto; overflow: hidden; }
 @keyframes route-emphasis { from { stroke-width: 15; stroke-opacity: .5; } to { stroke-width: 9; stroke-opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .route-highlight { animation: none; } }
 @media (max-width: 1100px) { .passage-preview .route-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Planner overview: primary inputs and map first, deeper analysis on demand. */
+.planner-page .page-title { margin-bottom: 24px; }
+.planner-page .page-title h1 { font-size: clamp(30px, 3vw, 40px); }
+.planner-page .page-title p { font-size: 14px; }
+.route-overview { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px 28px; margin-bottom: 22px; padding: 18px 0; border-block: 1px solid var(--border); }
+.route-overview small, .route-overview strong { display: block; }
+.route-overview small { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+.route-overview strong { font-size: 15px; font-weight: 500; }
+.route-overview-values { display: flex; gap: clamp(20px, 4vw, 56px); }
+.planner-page .planner-grid { grid-template-areas: "preview config"; }
+.planner-page .config { grid-area: config; }
+.planner-page .passage-preview { grid-area: preview; }
+.planner-page .map-wrap { height: 420px; }
+.planner-disclosure > summary, .planner-report > summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; list-style: none; }
+.planner-disclosure > summary::-webkit-details-marker, .planner-report > summary::-webkit-details-marker, .coverage-note > summary::-webkit-details-marker { display: none; }
+.planner-disclosure > summary strong, .planner-report > summary strong { display: block; font-size: 14px; font-weight: 500; }
+.planner-disclosure > summary small, .planner-report > summary small { display: block; font-size: 12px; color: var(--muted); margin-top: 5px; overflow-wrap: anywhere; }
+.planner-disclosure > summary > svg, .planner-report > summary > svg { flex-shrink: 0; color: var(--muted); transition: transform .15s; }
+.planner-disclosure[open] > summary > svg, .planner-report[open] > summary > svg { transform: rotate(45deg); }
+.config .planner-disclosure { border-top: 1px solid var(--border); padding: 18px 0; }
+.config .disclosure-content { padding-top: 20px; }
+.config .cargo-picker { margin-bottom: 0; }
+.config .advanced { margin: 0 0 20px; padding-top: 18px; }
+.compare-disclosure { margin-top: 16px; }
+.compare-disclosure > summary, .planner-report > summary { padding: 20px 24px; }
+.compare-disclosure .disclosure-content { padding: 0 20px 20px; }
+.passage-preview .compare-disclosure .routes-section { margin-top: 0; }
+.coverage-note > summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; cursor: pointer; list-style: none; }
+.coverage-note > summary > span { color: var(--muted); font-size: 11px; text-decoration: underline; text-underline-offset: 3px; }
+.planner-report { margin-top: 24px; }
+.planner-report-body { padding: 0 24px 24px; border-top: 1px solid var(--border); }
+.planner-report-body > .stats { margin-block: 24px; }
+.planner-report-body .deadline-summary { margin-block: 24px; }
+@media (max-width: 800px) {
+  .planner-page .planner-grid { grid-template-areas: "config" "preview"; }
+  .route-overview { align-items: flex-start; gap: 18px; }
+  .route-overview-values { width: 100%; justify-content: space-between; gap: 10px; }
+  .route-overview-values strong { font-size: 12px; }
+  .planner-report-body { padding: 0 16px 16px; }
+  .planner-page .map-wrap { height: 360px; }
+}
+@container (max-width: 760px) { .planner-page .planner-grid { grid-template-areas: "config" "preview"; } }
+
+.planner-page .page-title > div { flex: 1; min-width: 0; }
+@media (max-width: 600px) {
+  .planner-page .page-title { flex-wrap: nowrap; gap: 10px; }
+  .planner-page .page-title h1 { font-size: 28px; }
+  .planner-page .page-title .planner-export { width: 40px; height: 40px; padding: 0; margin-top: 0; flex-shrink: 0; justify-content: center; }
+  .planner-export .export-label { display: none; }
+}
