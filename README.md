@@ -142,3 +142,9 @@ Production storage adapter: backend/database.py. Neon uses psycopg with pooled c
 
 
 
+
+## Workspace search
+
+Use the header search button or Ctrl/Cmd+K to find features, every supported port, and all cargo products. Suggestions update as you type; use the arrow keys and Enter, or select a result directly. Port suggestions explicitly set departure or destination; cargo suggestions add products without duplicates and respect the 10-item limit. Feature results open the appropriate controls, including appearance, route comparison, exports, and custom cargo. Escape closes search.
+
+Signed-in users can also search all their saved voyages and vessels. Server-side search is debounced and cancellable, with more-results controls for paginated matches. Selecting a voyage loads its complete saved data; selecting a vessel assigns its current specifications. Account changes and expired sessions dismiss search and clear its private results. Run `npm run test:search` against the isolated browser test server for live suggestions, keyboard actions, pagination, stale responses, and 320–1440px layouts.

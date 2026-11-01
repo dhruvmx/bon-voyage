@@ -13,7 +13,8 @@
     "test:browser": "node tests/browser-races.cjs",
     "test:intro": "node tests/browser-intro.cjs",
     "test:planner": "node tests/browser-planner.cjs",
-    "test:dialogs": "node tests/browser-dialogs.cjs"
+    "test:dialogs": "node tests/browser-dialogs.cjs",
+    "test:search": "node tests/browser-search.cjs"
   },
   "dependencies": {
     "react": "^19.2.0",

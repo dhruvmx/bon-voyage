@@ -27,11 +27,12 @@ import { api, download, getSessionVersion } from "./api";
 import VoyageMap from "./Map";
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
+import WorkspaceSearch from "./WorkspaceSearch";
 import Intro from "./Intro";
 import { shouldShowIntro } from "./intro";
 import SidebarControls from "./SidebarControls";
 import CargoPicker from "./CargoPicker";
-import { cargoItems, manifestInputs, manifestError, whaleAssessed, formatHours, formatDuration } from "./cargo";
+import { cargoItems, manifestInputs, manifestError, MAX_CARGO_ITEMS, whaleAssessed, formatHours, formatDuration } from "./cargo";
 
 const freshInputs = () => ({
   origin: "la",
@@ -536,6 +537,77 @@ export default function App() {
   const selectedVessel = vessels.find((v) => v.id === vesselId),
     capacityError = selectedVessel && inputs.weight > selectedVessel.capacity;
   const ready = route && !calculating && !planError && !capacityError;
+  function openSaveDialog() {
+    if (!ready) { notify("Wait for a valid passage before saving."); return; }
+    if (requireAuth()) {
+      setDataError("");
+      if (!voyageName) setVoyageName(`${manifest.length > 1 ? `${manifest.length} cargo items` : inputs.cargo_name} · ${catalog.ports.find((p) => p.id === inputs.destination)?.name || inputs.destination}`.slice(0, 120));
+      setModal("save");
+    }
+  }
+  function revealPlanner(selector, focusSelector) {
+    switchView("planner");
+    requestAnimationFrame(() => {
+      const target = document.querySelector(selector);
+      if (!target) return;
+      if (target.tagName === "DETAILS") target.open = true;
+      target.scrollIntoView({ block: "center", behavior: "auto" });
+      target.querySelector(focusSelector || "summary, input, select, button")?.focus({ preventScroll: true });
+    });
+  }
+  async function searchAction(item) {
+    if (item.kind === "voyage") { loadVoyage(item.item); return; }
+    if (item.kind === "vessel") {
+      const owner = account.current, session = getSessionVersion(), draft = draftVersion.current;
+      try {
+        const ship = await api(`/vessels/${item.item.id}`);
+        if (owner !== account.current || session !== getSessionVersion() || draft !== draftVersion.current) return;
+        setVessels((previous) => [...previous.filter((v) => v.id !== ship.id), ship]);
+        setVesselId(ship.id);
+        setInputs((previous) => ({ ...previous, max_speed: ship.max_speed, min_speed: ship.min_speed, fuel_per_day: ship.fuel_per_day }));
+        revealPlanner("details.advanced"); notify(`${ship.name} assigned to this passage.`);
+      } catch (e) { if (owner === account.current && session === getSessionVersion()) setDataError(e.message); }
+      return;
+    }
+    if (item.kind === "port") {
+      setInputs((previous) => {
+        const other = item.field === "origin" ? "destination" : "origin";
+        return { ...previous, [item.field]: item.value, [other]: previous[other] === item.value ? previous[item.field] : previous[other] };
+      });
+      revealPlanner(".port-pickers", `label:nth-of-type(${item.field === "origin" ? 1 : 2}) select`);
+      return;
+    }
+    if (item.kind === "cargo") {
+      const product = item.product;
+      if (manifest.some((cargo) => cargo.product_id === product.id || cargo.name.toLowerCase() === product.name.toLowerCase())) notify(`${product.name} is already in your manifest.`);
+      else if (manifest.length >= MAX_CARGO_ITEMS) notify("Your manifest is full. Remove an item before adding another.");
+      else {
+        setInputs((previous) => manifestInputs(previous, [...cargoItems(previous), { product_id: product.id, name: product.name, profile: product.profile, weight: 10, temperature: product.temperature, shelf_life: product.shelf_life, cargo_age: 0, routing_priority: "auto" }]));
+        notify(`${product.name} added to the manifest.`);
+      }
+      revealPlanner(".cargo-editor"); return;
+    }
+    const [action, value] = item.id.split(":");
+    if (["planner", "voyages", "fleet", "insights", "profile"].includes(action)) { switchView(action); return; }
+    if (action === "new") { newVoyage(); return; }
+    const panels = { cargo: ".cargo-editor", deadline: ".deadline-editor", advanced: "details.advanced", compare: ".compare-disclosure", report: ".planner-report", map: ".map-panel", coverage: ".coverage-note" };
+    if (panels[action]) { revealPlanner(panels[action]); return; }
+    if (action === "layers") { revealPlanner(".map-panel"); requestAnimationFrame(() => { if (!document.querySelector(".layer-menu")) document.querySelector('[aria-label="Map layers"]')?.click(); }); return; }
+    if (action === "save") { openSaveDialog(); return; }
+    if (action === "export") {
+      if (ready) download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at });
+      else notify("Wait for a valid passage before exporting.");
+      return;
+    }
+    if (["appearance", "theme", "mode"].includes(action)) {
+      const panel = document.getElementById("appearance-panel"); panel?.showPopover();
+      if (value) { panel?.querySelector(`input[name="workspace-${action}"][value="${value}"]`)?.click(); panel?.hidePopover(); }
+      return;
+    }
+    if (action === "help") setModal("help");
+    if (action === "add-vessel" && requireAuth()) setModal({ type: "vessel", item: null });
+    if (action === "login" || action === "signup") { setAuthMode(action); setModal("auth"); }
+  }
   const renderedModalVersion = modalVersion.current;
   return (
     <>
@@ -613,9 +685,10 @@ export default function App() {
             </b>
           </div>
           <div className="header-actions">
+            <WorkspaceSearch catalog={catalog} user={user} blocked={Boolean(modal) || introState === "playing"} onAction={searchAction} />
             <Appearance />
             <button
-              className="icon-button"
+              className="icon-button header-help"
               aria-label="How Bon Voyage works"
               onClick={() => setModal("help")}
             >
@@ -939,16 +1012,7 @@ export default function App() {
                     <button
                       className="button full"
                       disabled={!ready}
-                      onClick={() => {
-                        if (requireAuth()) {
-                          setDataError("");
-                          if (!voyageName)
-                            setVoyageName(
-                              `${manifest.length > 1 ? `${manifest.length} cargo items` : inputs.cargo_name} · ${catalog.ports.find((p) => p.id === inputs.destination).name}`.slice(0, 120),
-                            );
-                          setModal("save");
-                        }
-                      }}
+                      onClick={openSaveDialog}
                     >
                       {calculating
                         ? "Calculating passage…"
