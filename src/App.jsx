@@ -807,7 +807,9 @@ export default function App() {
                   <span><small>Arrival</small><strong>{date(route.eta)}</strong></span>
                 </div>
               </section>}
-              <section className="stats">
+              <section className="voyage-dashboard" aria-labelledby="voyage-dashboard-title">
+                <h2 id="voyage-dashboard-title">Voyage dashboard</h2>
+              <section className="stats" aria-label="Live voyage statistics">
                 <Stat
                   label={manifest.length > 1 ? "Cargo freshness now (avg.)" : "Cargo freshness now"}
                   value={journey ? journey.freshness.toFixed(1) : "—"}
@@ -839,6 +841,7 @@ export default function App() {
                   dark
                   icon={ShieldCheck}
                 />
+              </section>
               </section>
               <div className="planner-grid">
                 <section className="panel config">

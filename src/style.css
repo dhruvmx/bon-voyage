@@ -558,3 +558,7 @@ dialog.workspace-search > .workspace-search-empty { padding: 24px 20px; margin: 
 }
 
 .workspace-search-clear { min-height: 44px; font-size: 12px; }
+
+.voyage-dashboard { margin-bottom: 28px; }
+.voyage-dashboard > h2 { font-size: 16px; margin-bottom: 14px; }
+.voyage-dashboard > .stats { margin-bottom: 0; }
