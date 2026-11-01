@@ -12,7 +12,7 @@ def full_records(client):
 
 class BonVoyageTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(dir=main.ROOT / "data"); self.old=main.DB
+        self.temp=tempfile.TemporaryDirectory(); self.old=main.DB
         main.DB=Path(self.temp.name)/'test.sqlite3';main.init_db()
         self.a=TestClient(main.app);self.b=TestClient(main.app)
         self.inputs={'departure':'2026-11-01T06:00:00Z'}
