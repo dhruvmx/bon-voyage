@@ -21,9 +21,9 @@ python run.py
 ```
 
 - Installs dependencies, builds the frontend and starts the server.
-- Open [localhost:8000](http://localhost:8000). Stop with Ctrl+C.
+- Open `http://localhost:8000`. Stop with Ctrl+C.
 - Windows: double-click [Start-Bon-Voyage.cmd](Start-Bon-Voyage.cmd).
-- Development: run `npm run dev` alongside the Python server; open [localhost:5173](http://localhost:5173).
+- Development: run `npm run dev` alongside the Python server; open `http://localhost:5173`.
 
 ## Stack & storage
 
@@ -45,7 +45,8 @@ npm run build
 
 ## Reference
 
-- [API docs](http://localhost:8000/docs) — available with the server running.
+- [Repository structure](STRUCTURE.md)
+- [API routes](backend/main.py) — local interactive docs: `http://localhost:8000/docs`.
 - [Calculations & data coverage](backend/DATA.md) — planning models and mapped whale zones, not live tracking.
 - [Data licences](public/DATA-LICENSE.md)
 - [Frontend](src/) · [Backend](backend/) · [Vercel config](vercel.json)
