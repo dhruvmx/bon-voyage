@@ -188,13 +188,19 @@ export default function App() {
     [loadingMore, setLoadingMore] = useState("");
   const listRequest = useRef(0), account = useRef(null), assignedVessel = useRef(""), expiredDraft = useRef(null), paging = useRef(false);
   account.current = user?.id; assignedVessel.current = vesselId;
-  const [modal, setModal] = useState(null),
+  const [modal, setModalState] = useState(null),
     [authMode, setAuthMode] = useState("signup"),
     [toast, setToast] = useState(""),
     [dataError, setDataError] = useState(""),
     [progress, setProgress] = useState(0),
     [playing, setPlaying] = useState(false),
     [query, setQuery] = useState("");
+  const modalVersion = useRef(0), pendingRemovals = useRef(new Set());
+  const [removingIds, setRemovingIds] = useState([]);
+  const setModal = useCallback((next) => {
+    ++modalVersion.current;
+    setModalState(next);
+  }, []);
   const [introState, setIntroState] = useState(() => shouldShowIntro() ? "playing" : "done");
   const closeModal = useCallback(() => setModal(null), []),
     requestNo = useRef(0),
@@ -270,18 +276,19 @@ export default function App() {
   }
   useEffect(() => {
     let active = true;
-    api("/catalog")
+    const controller = new AbortController();
+    api("/catalog", { signal: controller.signal })
       .then((x) => active && setCatalog(x))
       .catch((e) => active && setPlanError(e.message));
     const startupSession = getSessionVersion();
-    api("/auth/me")
+    api("/auth/me", { signal: controller.signal })
       .then((x) => active && startupSession === getSessionVersion() && setUser(x))
       .catch((e) => {
         if (e.status !== 401 && active) setDataError(e.message);
       })
       .finally(() => active && setAuthChecked(true));
     return () => {
-      active = false;
+      active = false; controller.abort();
     };
   }, []);
   useEffect(() => {
@@ -303,11 +310,12 @@ export default function App() {
       ++requestNo.current; setPlanError(cargoError); setResult(null); setCalculating(false); return;
     }
     const n = ++requestNo.current;
+    const controller = new AbortController();
     setCalculating(true);
     setPlanError("");
     const timer = setTimeout(
       () =>
-        api("/plan", { method: "POST", body: inputs })
+        api("/plan", { method: "POST", body: inputs, signal: controller.signal })
           .then((x) => {
             if (n === requestNo.current) {
               setResult(x);
@@ -326,7 +334,7 @@ export default function App() {
           }),
       300,
     );
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [inputs, catalog, manifest]);
   useEffect(() => {
     setProgress(0);
@@ -473,7 +481,7 @@ export default function App() {
     e.preventDefault();
     if (!route || saving) return;
     const owner = account.current, draft = draftVersion.current;
-    const session = getSessionVersion(), operation = ++saveOperation.current;
+    const session = getSessionVersion(), operation = ++saveOperation.current, dialog = modalVersion.current;
     const isCurrent = () => owner === account.current && draft === draftVersion.current && session === getSessionVersion() && operation === saveOperation.current;
     setSaving(true);
     setDataError("");
@@ -493,7 +501,7 @@ export default function App() {
       setEditingId(saved.id);
       await refresh();
       if (!isCurrent()) return;
-      setModal((previous) => previous === "save" ? null : previous);
+      if (dialog === modalVersion.current) setModal(null);
       notify(editingId ? "Voyage updated." : "Voyage saved to your account.");
     } catch (err) {
       if (isCurrent()) setDataError(err.message);
@@ -502,19 +510,32 @@ export default function App() {
     }
   }
   async function removeRecord(type, id) {
+    if (pendingRemovals.current.has(id)) return;
+    const dialog = modalVersion.current, owner = account.current;
+    const session = getSessionVersion(), draft = draftVersion.current;
+    const isOwner = () => owner === account.current && session === getSessionVersion();
+    pendingRemovals.current.add(id); setRemovingIds((previous) => [...previous, id]);
     try {
       await api("/" + type + "/" + id, { method: "DELETE" });
+      if (!isOwner()) return;
       await refresh();
-      if (type === "voyages" && editingId === id) setEditingId(null);
+      if (!isOwner()) return;
+      if (type === "voyages" && editingId === id && draft === draftVersion.current) {
+        invalidateDraftRequests(); setEditingId(null);
+      }
       notify(type === "voyages" ? "Voyage deleted." : "Vessel removed.");
-      setModal(null);
+      if (dialog === modalVersion.current) setModal(null);
     } catch (e) {
-      setDataError(e.message);
+      if (isOwner() && dialog === modalVersion.current) setDataError(e.message);
+    } finally {
+      pendingRemovals.current.delete(id);
+      setRemovingIds((previous) => previous.filter((record) => record !== id));
     }
   }
   const selectedVessel = vessels.find((v) => v.id === vesselId),
     capacityError = selectedVessel && inputs.weight > selectedVessel.capacity;
   const ready = route && !calculating && !planError && !capacityError;
+  const renderedModalVersion = modalVersion.current;
   return (
     <>
       <aside className="sidebar" inert={introState === "playing"}>
@@ -1069,6 +1090,7 @@ export default function App() {
                   <Search size={15} />
                   <input
                     aria-label="Search voyages"
+                    maxLength={100}
                     placeholder="Search your voyages…"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
@@ -1260,7 +1282,8 @@ export default function App() {
           onClose={closeModal}
           onSuccess={(u) => {
             const draft = expiredDraft.current; expiredDraft.current = null;
-            account.current = u.id; setUser(u); setModal(null);
+            account.current = u.id; setUser(u);
+            if (renderedModalVersion === modalVersion.current) setModal(null);
             if (draft?.owner === u.id) {
               setEditingId(draft.editingId);
               if (draft.vesselId) api(`/vessels/${draft.vesselId}`).then((ship) => {
@@ -1358,15 +1381,17 @@ export default function App() {
           item={modal.item}
           onClose={closeModal}
           onSave={async (data) => {
+            const dialog = renderedModalVersion, owner = account.current, session = getSessionVersion();
+            const isOwner = () => owner === account.current && session === getSessionVersion();
             await api("/vessels" + (modal.item ? "/" + modal.item.id : ""), {
               method: modal.item ? "PUT" : "POST",
               body: data,
             });
+            if (!isOwner()) return;
             await refresh();
-            setModal(null);
-            notify(
-              "Vessel " + (modal.item ? "updated." : "added to your fleet."),
-            );
+            if (!isOwner()) return;
+            if (dialog === modalVersion.current) setModal(null);
+            notify(`Vessel “${data.name.trim()}” saved.`);
           }}
         />
       )}
@@ -1391,9 +1416,10 @@ export default function App() {
             </button>
             <button
               className="button danger"
+              disabled={removingIds.includes(modal.item.id)}
               onClick={() => removeRecord(modal.record, modal.item.id)}
             >
-              Remove
+              {removingIds.includes(modal.item.id) ? "Removing…" : "Remove"}
             </button>
           </div>
         </Modal>

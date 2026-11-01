@@ -35,3 +35,26 @@ test('incorrect passwords do not expire the session or renew its version', async
   await assert.rejects(api('/auth/login',{method:'POST'}),e=>e.status===401);
   assert.equal(events,0); assert.equal(getSessionVersion(),before);
 });
+
+test('HTML and empty successful responses report an error instead of entering app state', async () => {
+  for (const json of [async()=>{throw new SyntaxError('HTML');},async()=>null,async()=>'unexpected text']) {
+    globalThis.fetch=async()=>({ok:true,status:200,json});
+    await assert.rejects(api('/catalog'),/invalid response/);
+  }
+});
+test('stalled reads and stalled response bodies time out', async () => {
+  const aborted=(signal)=>new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}));
+  globalThis.fetch=async(_,options)=>aborted(options.signal);
+  await assert.rejects(api('/catalog',{timeoutMs:10}),/timed out/);
+  globalThis.fetch=async(_,options)=>({ok:true,status:200,json:()=>aborted(options.signal)});
+  await assert.rejects(api('/plan',{method:'POST',body:{},timeoutMs:10}),/timed out/);
+});
+test('caller cancellation stops a request without expiring a session', async () => {
+  globalThis.window=new EventTarget();
+  let events=0; window.addEventListener('bon-voyage-session-expired',()=>events++);
+  globalThis.fetch=async(_,options)=>new Promise((_,reject)=>{
+    options.signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true});
+  });
+  const controller=new AbortController(), request=api('/plan',{method:'POST',signal:controller.signal});
+  controller.abort(); await assert.rejects(request,/cancelled/); assert.equal(events,0);
+});

@@ -12,7 +12,8 @@
     "test:frontend": "node --test src/*.test.js",
     "test:browser": "node tests/browser-races.cjs",
     "test:intro": "node tests/browser-intro.cjs",
-    "test:planner": "node tests/browser-planner.cjs"
+    "test:planner": "node tests/browser-planner.cjs",
+    "test:dialogs": "node tests/browser-dialogs.cjs"
   },
   "dependencies": {
     "react": "^19.2.0",
