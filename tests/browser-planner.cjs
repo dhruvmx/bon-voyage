@@ -55,7 +55,7 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     assert((await page.locator('.route-overview').innerText()).includes('Fastest feasible arrival'));
     assert(await page.locator('.route-highlight').count() > 0);
     await page.locator('.planner-report > summary').click();
-    assert(await page.getByText('Fuel consumed', { exact: true }).isVisible());
+    assert(await page.getByText('Simulated fuel consumed', { exact: true }).isVisible());
     assert(await page.getByRole('heading', { name: 'Cargo on arrival', exact: true }).isVisible());
     assert((await page.locator('.cargo-arrival table').innerText()).includes('Demo crates'));
     assert(await page.getByLabel('Deadline and arrival estimate', { exact: true }).isVisible());

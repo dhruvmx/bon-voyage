@@ -2,7 +2,7 @@
 import math
 from .cargo_model import prepared_objective, score_candidate
 
-OPTIMIZER_VERSION = 'deadline-speed-v3'
+OPTIMIZER_VERSION = 'deadline-speed-quality-v4'
 SPEED_RESOLUTION = .01
 PROTECTED_SPEED_RESOLUTION = .1
 MIN_PROTECTED_SPEED = 5
@@ -19,6 +19,7 @@ def habitat_protection(whale_distance, speed, activity):
 def search_passages(paths, p, outcomes, habitat_assessed):
     objective = prepared_objective(outcomes,habitat_assessed)
     remaining = objective['remaining_hours']
+    quality_budgets = [(item['departure_remaining_hours'] - .7*item['effective_shelf_life_hours'], item['effective_shelf_life_hours']) for item in outcomes if item['perishable']]
     expiry_budgets = objective['expiry_budgets']
     weights = objective['weights']
     min_tick = math.ceil(p.min_speed*100-1e-9)
@@ -55,7 +56,8 @@ def search_passages(paths, p, outcomes, habitat_assessed):
                 expired = 0
                 for budget,weight in expiry_budgets:
                     if hours>=budget: expired += weight
-                quality_key = (expired,score,hours,fuel,path['id'],speed,zone_speed)
+                quality_shortfall = max((max(0,(hours-budget)/life) for budget,life in quality_budgets),default=0)
+                quality_key = (expired,quality_shortfall,score,hours,fuel,path['id'],speed,zone_speed)
                 time_key = (hours,fuel,expired,score,path['id'],speed,zone_speed)
                 fuel_key = (fuel,expired,score,hours,path['id'],speed,zone_speed)
                 evaluated += 1
@@ -92,5 +94,6 @@ def search_passages(paths, p, outcomes, habitat_assessed):
         'feasible_combinations':feasible_count,'reference_fuel_tonnes':reference_fuel,
         'earliest_possible_hours':earliest['hours'],
         'deadline_binding':feasible and (best['path']['id'],best['speed'],best['zone_speed'])!=(unconstrained['path']['id'],unconstrained['speed'],unconstrained['zone_speed']),
-        'scope':'Best among the supplied sea paths at 0.01-knot open-water and 0.1-knot protected-speed resolution (including the exact protected cap).',
+        'arrival_quality_target_percent':70,
+        'scope':'Recommended balance prioritizes avoiding expiry and minimizing worst-item shortfall below 70% modeled quality, then cost. Best among the supplied sea paths at 0.01-knot open-water and 0.1-knot protected-speed resolution (including the exact protected cap).',
     }

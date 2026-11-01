@@ -80,11 +80,27 @@ class OptimizerTests(unittest.TestCase):
                     protection=100*50/(50+path['whale_distance']*(zone_speed/10)**2*p.whale_activity)
                     score,expired,_=score_route({'hours':hours,'fuel':fuel,'protection':protection,
                                                 'cargo_results':cargo_outcomes(p,hours)},ref,True)
-                    oracle.append((expired,score,hours,fuel,path['id'],speed,zone_speed))
+                    # Use unrounded quality to distinguish adjacent speeds.
+                    shortfall=max((max(0,(hours-item['departure_remaining_hours']+.7*item['effective_shelf_life_hours'])/item['effective_shelf_life_hours']) for item in cargo_outcomes(p,0) if item['perishable']),default=0)
+                    oracle.append((expired,shortfall,score,hours,fuel,path['id'],speed,zone_speed))
         expected=min(oracle)
         choice=choices['balanced']
         self.assertEqual((choice['path']['id'],choice['speed'],choice['zone_speed']),expected[-3:])
         self.assertEqual(metadata['evaluated_combinations'],len(paths)*21*51)
+
+    def test_long_passage_prioritizes_quality_over_slow_cheap_arrival(self):
+        p=PlanInput(departure='2026-11-01T00:00:00Z',arrival_window=200,min_speed=10,max_speed=20,
+                    cargo_items=[{'product_id':'apples','weight':1,'shelf_life':100,'temperature':4},
+                                 {'product_id':'computers','weight':999}])
+        paths=[{'id':'ocean','distance':1000,'open_distance':1000,'protected_distance':0,
+                'whale_distance':0,'segments':[{'zone':None,'distance':1000}]}]
+        choices,metadata=search_passages(paths,p,cargo_outcomes(p,0),False)
+        self.assertEqual(choices['balanced']['speed'],20)
+        self.assertGreater(choices['balanced']['speed'],choices['eco']['speed'])
+        self.assertEqual(metadata['arrival_quality_target_percent'],70)
+        # An impossible quality target is never satisfied by changing shelf life.
+        outcomes=cargo_outcomes(p,choices['balanced']['hours'])
+        self.assertLess(outcomes[0]['freshness'],70)
 
     def test_lowest_fuel_optimizes_protected_speeds_below_cap(self):
         result=calculate(PlanInput(departure='2026-11-01T00:00:00Z',arrival_window=168,
@@ -156,7 +172,7 @@ class OptimizerTests(unittest.TestCase):
                     self.assertEqual(response.status_code,201,response.text)
                     saved=full_records(client)[0]
                     self.assertEqual(saved['inputs']['min_speed'],12)
-                    self.assertEqual(saved['optimization']['version'],'deadline-speed-v3')
+                    self.assertEqual(saved['optimization']['version'],'deadline-speed-quality-v4')
                     self.assertIn('deadline_at',saved)
                     self.assertGreater(saved['result']['slack_hours'],0)
                     inputs['fuel_per_day']=1

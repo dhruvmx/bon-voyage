@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { positionAtProgress } from "./voyagePosition";
+import { positionAtProgress, headingAtProgress } from "./voyagePosition";
 import "leaflet/dist/leaflet.css";
 import { Layers, LocateFixed, Pause, Play } from "lucide-react";
 
@@ -311,6 +311,8 @@ export default function VoyageMap({
   useEffect(() => {
     if (!ship.current || !route || !route.segments) return;
     ship.current.setLatLng(positionAtProgress(route, progress));
+    const arrow = ship.current.getElement()?.querySelector("span");
+    if (arrow) arrow.style.transform = `rotate(${headingAtProgress(route, progress) - 90}deg)`;
   }, [progress, route, layers]);
 
   return (

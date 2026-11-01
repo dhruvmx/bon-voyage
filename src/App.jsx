@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { api, download, getSessionVersion } from "./api";
 import VoyageMap from "./Map";
+import { journeyAtProgress } from "./journey";
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
 import WorkspaceSearch from "./WorkspaceSearch";
@@ -355,62 +356,7 @@ export default function App() {
   }, [progress]);
   const route = result?.routes.find((x) => x.id === selected),
     cargo = catalog?.cargo_types[inputs.cargo_type];
-  const journey = useMemo(() => {
-    if (!route) return null;
-
-    const fraction = Math.max(0, Math.min(1, progress / 100));
-    const elapsedHours = route.hours * fraction;
-    const remainingHours = Math.max(0, route.hours - elapsedHours);
-    const outcomes = Array.isArray(route.cargo_results) ? route.cargo_results : [];
-    const manifestWeight = outcomes.reduce((sum, item) => sum + (Number(item.weight) || 0), 0);
-    const currentFreshness = outcomes.length && manifestWeight > 0
-      ? outcomes.reduce((sum, item) => {
-          if (!item.perishable) return sum + (Number(item.weight) || 0) * 100;
-          const effectiveLife = Number(item.effective_shelf_life_hours);
-          const departureRemaining = Number(item.departure_remaining_hours);
-          const quality = Number.isFinite(effectiveLife) && effectiveLife > 0 && Number.isFinite(departureRemaining)
-            ? Math.max(0, Math.min(100, 100 * (departureRemaining - elapsedHours) / effectiveLife))
-            : Number(item.freshness) || 0;
-          return sum + (Number(item.weight) || 0) * quality;
-        }, 0) / manifestWeight
-      : Number(route.freshness) || 0;
-
-    const segments = Array.isArray(route.segments) ? route.segments : [];
-    const totalFuelWeight = segments.reduce((sum, segment) => {
-      const speed = Number(segment.speed) || Number(route.speed) || 0;
-      return sum + Math.max(0, Number(segment.distance) || 0) * speed * speed;
-    }, 0);
-    let elapsedSegmentHours = 0;
-    let usedFuelWeight = 0;
-    let activeSegment = segments[0] || null;
-    for (const segment of segments) {
-      const duration = Math.max(0, Number(segment.hours) || 0);
-      const speed = Number(segment.speed) || Number(route.speed) || 0;
-      const segmentFuelWeight = Math.max(0, Number(segment.distance) || 0) * speed * speed;
-      const segmentFraction = duration > 0
-        ? Math.max(0, Math.min(1, (elapsedHours - elapsedSegmentHours) / duration))
-        : (elapsedHours >= elapsedSegmentHours ? 1 : 0);
-      usedFuelWeight += segmentFuelWeight * segmentFraction;
-      if (elapsedHours <= elapsedSegmentHours + duration || segment === segments[segments.length - 1]) {
-        activeSegment = segment;
-        break;
-      }
-      elapsedSegmentHours += duration;
-    }
-    const fuel = Number(route.fuel) || 0;
-    const fuelConsumed = totalFuelWeight > 0
-      ? fuel * Math.max(0, Math.min(1, usedFuelWeight / totalFuelWeight))
-      : fuel * fraction;
-    return {
-      elapsedHours,
-      remainingHours,
-      freshness: Math.max(0, Math.min(100, currentFreshness)),
-      fuelConsumed: fraction >= 1 ? fuel : fuelConsumed,
-      co2Consumed: (fraction >= 1 ? fuel : fuelConsumed) * 3.114,
-      activeSegment,
-      activeSpeed: Number(activeSegment?.speed) || Number(route.speed) || 0,
-    };
-  }, [route, progress]);
+  const journey = useMemo(() => journeyAtProgress(route, progress), [route, progress]);
   const change = (key, value) => setInputs((p) => ({ ...p, [key]: value }));
   const requireAuth = () => {
     if (user) return true;
@@ -809,12 +755,15 @@ export default function App() {
               </section>}
               <section className="voyage-dashboard" aria-labelledby="voyage-dashboard-title">
                 <h2 id="voyage-dashboard-title">Voyage dashboard</h2>
-              <section className="stats" aria-label="Live voyage statistics">
+                <p className="dashboard-status" role="status">{calculating ? "Updating estimates… Previous results are shown until calculation finishes." : "Planning simulation · estimates follow map playback, not live vessel telemetry."}</p>
+                {journey?.arrivalFreshness != null && journey.arrivalFreshness < 70 && !calculating && <p className="warning" role="status">Cargo handling review needed: lowest modeled arrival quality is {journey.arrivalFreshness.toFixed(1)}%, below the 70% planning target. Choose a faster passage or verify product-specific transport temperature, remaining shelf life and cargo age. If these are correct, use a shorter supply chain; the model cannot preserve cargo beyond its usable life.</p>}
+                {journey?.worstFreshness !== null && journey?.worstFreshness < 70 && <p className="warning">At least one perishable item has only {journey.worstFreshness.toFixed(1)}% modeled shelf life left. Review its age, handling temperature and shelf life; this passage may not be suitable.</p>}
+              <section className="stats" aria-label="Simulated voyage statistics" aria-busy={calculating}>
                 <Stat
-                  label={manifest.length > 1 ? "Cargo freshness now (avg.)" : "Cargo freshness now"}
-                  value={journey ? journey.freshness.toFixed(1) : "—"}
-                  unit="%"
-                  sub={route ? `${Number(inputs.weight).toLocaleString()} tonnes · ${manifest.length} cargo item${manifest.length === 1 ? "" : "s"} · ${route.freshness.toFixed(1)}% forecast on arrival` : "Calculate a passage to see cargo quality"}
+                  label="Perishable shelf life remaining"
+                  value={journey?.worstFreshness != null ? journey.worstFreshness.toFixed(1) : "N/A"}
+                  unit={journey?.worstFreshness != null ? "%" : ""}
+                  sub={route ? `${Number(inputs.weight).toLocaleString()} tonnes · ${manifest.length} cargo item${manifest.length === 1 ? "" : "s"} · ${journey?.perishableCount ? `${Math.min(...route.cargo_results.filter((item) => item.perishable).map((item) => item.freshness)).toFixed(1)}% lowest on arrival` : "No perishable cargo"}` : "Calculate a passage to see cargo quality"}
                   icon={Leaf}
                 />
                 <Stat
@@ -825,18 +774,18 @@ export default function App() {
                   icon={Clock}
                 />
                 <Stat
-                  label="Fuel consumed"
+                  label="Simulated fuel consumed"
                   value={journey ? journey.fuelConsumed.toFixed(2) : "—"}
                   unit="t"
                   sub={route && journey ? `${route.fuel.toFixed(1)} t planned · ${journey.co2Consumed.toFixed(2)} t CO₂ used` : "Speed-adjusted consumption"}
                   icon={BarChart3}
                 />
                 <Stat
-                  label="Whale assessment"
+                  label="Whole-route whale assessment"
                   value={whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"}
                   unit={whaleAssessed(route, inputs) ? "/100" : ""}
                   sub={route && journey
-                    ? `${journey.activeSegment?.zone || "Open-water leg"} · ${journey.activeSpeed.toFixed(1)} kn${whaleAssessed(route, inputs) ? ` · route score ${Math.round(route.protection)}/100` : ""}`
+                    ? `${whaleAssessed(route, inputs) ? "Modeled habitat exposure · higher is better; not a safety probability" : "Habitat coverage incomplete; no score available"}`
                     : whaleAssessed(route, inputs) ? "California scenario estimate" : "Habitat coverage incomplete"}
                   dark
                   icon={ShieldCheck}
@@ -1095,7 +1044,7 @@ export default function App() {
                 {route.score_breakdown && <div className="route-priorities">
                   <strong>Applied route priorities</strong>
                   <span>{Math.round(route.score_breakdown.weights.freshness * 100)}% freshness · {Math.round(route.score_breakdown.weights.fuel * 100)}% fuel · {route.score_breakdown.components.habitat === null ? "Habitat unassessed" : `${Math.round(route.score_breakdown.weights.habitat * 100)}% habitat`}</span>
-                  <small>Arrival feasibility and avoiding newly exhausted cargo budgets come first. Then these weights rank quality loss, fuel use, and available habitat data.</small>
+                  <small>For Recommended balance, arrival feasibility, avoiding expiry and reducing the worst perishable shortfall below the 70% quality target come before these cost weights. Fastest and lowest-fuel alternatives retain their own objectives.</small>
                 </div>}
                 <div className="cargo-table-wrap"><table><caption className="sr-only">Cargo freshness and remaining shelf life</caption>
                   <thead><tr><th scope="col">Cargo</th><th scope="col">Weight</th><th scope="col">Freshness</th><th scope="col">Shelf life left</th></tr></thead>
@@ -1875,7 +1824,7 @@ function Insights({ voyages, stats, onPlan }) {
           icon={Leaf}
         />
         <Stat
-          label="Whale assessment"
+          label="Whole-route whale assessment"
           value={protection === null ? "N/A" : Math.round(protection)}
           unit={protection === null ? "" : "/100"}
           sub={`${stats?.assessed ?? assessed.length} of ${stats?.total ?? voyages.length} voyages have California scenario estimates`}
