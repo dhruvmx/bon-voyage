@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
+import { positionAtProgress } from "./voyagePosition";
 import "leaflet/dist/leaflet.css";
 import { Layers, LocateFixed, Pause, Play } from "lucide-react";
 
@@ -309,19 +310,7 @@ export default function VoyageMap({
 
   useEffect(() => {
     if (!ship.current || !route || !route.segments) return;
-    const target = (route.hours * progress) / 100;
-    let elapsed = 0;
-    for (const s of route.segments) {
-      if (elapsed + s.hours >= target) {
-        const t = Math.min(1, (target - elapsed) / s.hours);
-        ship.current.setLatLng([
-          s.from[0] + (s.to[0] - s.from[0]) * t,
-          s.from[1] + (s.to[1] - s.from[1]) * t,
-        ]);
-        break;
-      }
-      elapsed += s.hours;
-    }
+    ship.current.setLatLng(positionAtProgress(route, progress));
   }, [progress, route, layers]);
 
   return (

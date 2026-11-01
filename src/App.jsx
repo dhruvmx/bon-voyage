@@ -23,7 +23,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { api, download } from "./api";
+import { api, download, getSessionVersion } from "./api";
 import VoyageMap from "./Map";
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
@@ -170,6 +170,10 @@ export default function App() {
     [notes, setNotes] = useState(""),
     [voyageStatus, setVoyageStatus] = useState("Planned");
   const [saving, setSaving] = useState(false);
+  const draftVersion = useRef(0), saveOperation = useRef(0);
+  const invalidateDraftRequests = useCallback(() => {
+    ++draftVersion.current; ++saveOperation.current; setSaving(false);
+  }, []);
   const [routeHighlight, setRouteHighlight] = useState(0);
   const preview = useRef(null);
   const showRouteOnMap = (id) => {
@@ -205,6 +209,7 @@ export default function App() {
   useEffect(() => {
     const expired = () => {
       if (!account.current) return;
+      invalidateDraftRequests();
       expiredDraft.current = { owner: account.current, editingId, vesselId };
       account.current = null; ++listRequest.current;
       setUser(null); setVoyages([]); setVessels([]); setStats(null);
@@ -214,7 +219,7 @@ export default function App() {
     };
     window.addEventListener("bon-voyage-session-expired", expired);
     return () => window.removeEventListener("bon-voyage-session-expired", expired);
-  }, [notify, editingId, vesselId]);
+  }, [notify, editingId, vesselId, invalidateDraftRequests]);
   const refresh = useCallback(async () => {
     if (!user) return;
     const n = ++listRequest.current, owner = user.id;
@@ -268,8 +273,9 @@ export default function App() {
     api("/catalog")
       .then((x) => active && setCatalog(x))
       .catch((e) => active && setPlanError(e.message));
+    const startupSession = getSessionVersion();
     api("/auth/me")
-      .then((x) => active && setUser(x))
+      .then((x) => active && startupSession === getSessionVersion() && setUser(x))
       .catch((e) => {
         if (e.status !== 401 && active) setDataError(e.message);
       })
@@ -433,25 +439,27 @@ export default function App() {
     });
   }, [vessels, vesselId, inputs.max_speed, inputs.min_speed, inputs.fuel_per_day]);
   async function loadVoyage(summary) {
-    const owner = account.current;
+    invalidateDraftRequests();
+    const owner = account.current, draft = draftVersion.current;
     try {
       const v = await api(`/voyages/${summary.id}`);
-      if (owner !== account.current) return;
+      if (owner !== account.current || draft !== draftVersion.current) return;
       if (v.vessel_id && !vessels.some((ship) => ship.id === v.vessel_id)) {
         try {
           const ship = await api(`/vessels/${v.vessel_id}`);
-          if (owner !== account.current) return;
+          if (owner !== account.current || draft !== draftVersion.current) return;
           setVessels((previous) => previous.some((s) => s.id === ship.id) ? previous : [...previous, ship]);
         } catch (e) { if (e.status !== 404) throw e; v.vessel_id = null; }
       }
-      if (owner !== account.current) return;
+      if (owner !== account.current || draft !== draftVersion.current) return;
       desiredRoute.current = v.route_id; setInputs(v.inputs);
       setVesselId(v.vessel_id || ""); setEditingId(v.id);
       setVoyageName(v.name); setNotes(v.notes); setVoyageStatus(v.status);
       setView("planner"); notify("Voyage loaded. Adjust inputs and save to update it.");
-    } catch (e) { if (owner === account.current) setDataError(e.message); }
+    } catch (e) { if (owner === account.current && draft === draftVersion.current) setDataError(e.message); }
   }
   const newVoyage = () => {
+    invalidateDraftRequests();
     expiredDraft.current = null;
     setInputs(freshInputs());
     setEditingId(null);
@@ -464,6 +472,9 @@ export default function App() {
   async function saveVoyage(e) {
     e.preventDefault();
     if (!route || saving) return;
+    const owner = account.current, draft = draftVersion.current;
+    const session = getSessionVersion(), operation = ++saveOperation.current;
+    const isCurrent = () => owner === account.current && draft === draftVersion.current && session === getSessionVersion() && operation === saveOperation.current;
     setSaving(true);
     setDataError("");
     try {
@@ -478,14 +489,16 @@ export default function App() {
           inputs,
         },
       });
+      if (!isCurrent()) return;
       setEditingId(saved.id);
       await refresh();
-      setModal(null);
+      if (!isCurrent()) return;
+      setModal((previous) => previous === "save" ? null : previous);
       notify(editingId ? "Voyage updated." : "Voyage saved to your account.");
     } catch (err) {
-      setDataError(err.message);
+      if (isCurrent()) setDataError(err.message);
     } finally {
-      setSaving(false);
+      if (operation === saveOperation.current) setSaving(false);
     }
   }
   async function removeRecord(type, id) {
@@ -990,6 +1003,7 @@ export default function App() {
                 onLogout={async () => {
                   try {
                     await api("/auth/logout", { method: "POST" });
+                    invalidateDraftRequests();
                     expiredDraft.current = null;
                     setUser(null);
                     setView("planner");

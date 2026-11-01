@@ -1,4 +1,10 @@
+// Version requests by authentication lifecycle, including renewal for the same user.
+let sessionVersion = 0;
+export const getSessionVersion = () => sessionVersion;
+const sessionActions = new Set(["/auth/login", "/auth/signup", "/auth/logout", "/auth/password"]);
+
 export async function api(path, options = {}) {
+  const requestSession = sessionVersion;
   let response;
   try {
     response = await fetch("/api" + path, {
@@ -15,7 +21,9 @@ export async function api(path, options = {}) {
   }
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 401 && !["/auth/login", "/auth/signup", "/auth/me"].includes(path)) {
+    const staleSession = requestSession !== sessionVersion;
+    if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/me"].includes(path)) {
+      ++sessionVersion;
       window.dispatchEvent(new Event("bon-voyage-session-expired"));
     }
     const detail = data?.detail;
@@ -25,8 +33,10 @@ export async function api(path, options = {}) {
         : detail || `Request failed (${response.status}).`,
     );
     error.status = response.status;
+    error.staleSession = staleSession;
     throw error;
   }
+  if (sessionActions.has(path)) ++sessionVersion;
   return data;
 }
 export function download(data, filename = "bon-voyage.json") {

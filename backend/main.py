@@ -151,7 +151,7 @@ class CargoItem(BaseModel):
     profile:str='electronics'
     weight:float=Field(default=1,ge=.001,le=100000)
     temperature:float|None=Field(default=None,ge=-30,le=40)
-    shelf_life:float|None=Field(default=None,gt=0,le=100000)
+    shelf_life:float|None=Field(default=None,ge=.001,le=100000)
     cargo_age:float=Field(default=0,ge=0,le=100000)
     routing_priority:Literal['auto','freshness','fuel','habitat']='auto'
 
@@ -174,15 +174,15 @@ class PlanInput(BaseModel):
     destination:str='oakland'
     cargo_type:str='avocados'
     cargo_name:str=Field(default='Avocados',min_length=1,max_length=100)
-    weight:float=Field(default=240,gt=0,le=100000)
+    weight:float=Field(default=240,ge=.001,le=100000)
     temperature:float=Field(default=5,ge=-30,le=40)
-    shelf_life:float=Field(default=336,gt=0,le=100000)
+    shelf_life:float=Field(default=336,ge=.001,le=100000)
     cargo_age:float=Field(default=0,ge=0,le=100000)
     arrival_window:float=Field(default=36,ge=1,le=2160)
     cargo_items:list[CargoItem]|None=Field(default=None,min_length=1,max_length=10)
     max_speed:float=Field(default=24,ge=5,le=35)
     min_speed:float|None=Field(default=None,ge=5,le=35)
-    fuel_per_day:float=Field(default=35,gt=0,le=500)
+    fuel_per_day:float=Field(default=35,ge=.001,le=500)
     whale_activity:float=Field(default=1,ge=.25,le=3)
     departure:str=Field(min_length=10,max_length=40)
     @model_validator(mode='after')
@@ -223,7 +223,7 @@ class Vessel(BaseModel):
     imo:str=Field(default='',max_length=7)
     max_speed:float=Field(default=24,ge=5,le=35)
     min_speed:float|None=Field(default=None,ge=5,le=35)
-    fuel_per_day:float=Field(default=35,gt=0,le=500)
+    fuel_per_day:float=Field(default=35,ge=.001,le=500)
     capacity:float=Field(default=12000,gt=0,le=500000)
     @model_validator(mode='after')
     def operating_range(self):
