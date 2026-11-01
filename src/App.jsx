@@ -321,13 +321,14 @@ export default function App() {
     const n = ++requestNo.current;
     const controller = new AbortController();
     setCalculating(true);
+    setPlaying(false);
     setPlanError("");
     const timer = setTimeout(
       () =>
         api("/plan", { method: "POST", body: inputs, signal: controller.signal })
           .then((x) => {
             if (n === requestNo.current) {
-              setResult(x);
+              setResult({ ...x, requestInputs: inputs });
               setSelected(x.status === "infeasible" ? x.recommended : (desiredRoute.current || x.recommended));
               desiredRoute.current = null;
             }
@@ -362,7 +363,8 @@ export default function App() {
   }, [progress]);
   const route = result?.routes.find((x) => x.id === selected),
     cargo = catalog?.cargo_types[inputs.cargo_type];
-  const journey = useMemo(() => journeyAtProgress(route, progress), [route, progress]);
+  const currentPlan = result?.requestInputs === inputs && !calculating;
+  const journey = useMemo(() => currentPlan ? journeyAtProgress(route, progress) : null, [route, progress, currentPlan]);
   const change = (key, value) => setInputs((p) => ({ ...p, [key]: value }));
   const requireAuth = () => {
     if (user) return true;
@@ -489,7 +491,7 @@ export default function App() {
   }
   const selectedVessel = vessels.find((v) => v.id === vesselId),
     capacityError = selectedVessel && inputs.weight > selectedVessel.capacity;
-  const ready = route && !calculating && !planError && !capacityError;
+  const ready = route && currentPlan && !calculating && !planError && !capacityError;
   function openSaveDialog() {
     if (!ready) { notify("Wait for a valid passage before saving."); return; }
     if (requireAuth()) {
@@ -758,32 +760,32 @@ export default function App() {
                   <h2 id="voyage-dashboard-title">Voyage dashboard</h2>
                   <span className="dashboard-status" role="status">{calculating ? "Updating…" : "Simulation"}</span>
                 </div>
-                {!calculating && journey && ((journey.arrivalFreshness != null && journey.arrivalFreshness < 70) || (journey.worstFreshness != null && journey.worstFreshness < 70)) && <p className="warning" role="status">Cargo below 70%: {journey.worstFreshness.toFixed(1)}% now · {journey.arrivalFreshness.toFixed(1)}% on arrival. Check cargo settings or choose a faster route.</p>}
+                {!calculating && journey && ((journey.arrivalFreshness != null && journey.arrivalFreshness < 70) || (journey.worstFreshness != null && journey.worstFreshness < 70)) && <p className="warning" role="status">Cargo below 70%: {(journey.worstFreshness?.toFixed(1) ?? "—")}% now · {(journey.arrivalFreshness?.toFixed(1) ?? "—")}% on arrival. Check cargo settings or choose a faster route.</p>}
               <section className="stats" aria-label="Simulated voyage statistics" aria-busy={calculating}>
                 <Stat
                   label="Cargo freshness"
-                  value={journey?.worstFreshness != null ? journey.worstFreshness.toFixed(1) : "N/A"}
+                  value={!currentPlan ? "—" : journey?.worstFreshness != null ? journey.worstFreshness.toFixed(1) : "N/A"}
                   unit={journey?.worstFreshness != null ? "%" : ""}
-                  sub={route ? `${journey?.perishableCount ? `Lowest item · ${journey.arrivalFreshness.toFixed(1)}% on arrival` : "No perishable cargo"}` : "No route calculated"}
+                  sub={!currentPlan ? (calculating ? "Updating…" : "No route calculated") : route ? `${journey?.perishableCount ? `Lowest item · ${(journey.arrivalFreshness?.toFixed(1) ?? "—")}% on arrival` : "No perishable cargo"}` : "No route calculated"}
                   icon={Leaf}
                 />
                 <Stat
                   label="Time remaining"
-                  value={journey ? journey.remainingHours.toFixed(1) : "—"}
+                  value={journey ? (journey.remainingHours?.toFixed(1) ?? "—") : "—"}
                   unit="hrs"
                   sub={journey ? `ETA ${date(route.eta)}` : "No route calculated"}
                   icon={Clock}
                 />
                 <Stat
                   label="Fuel used"
-                  value={journey ? journey.fuelConsumed.toFixed(2) : "—"}
+                  value={journey ? (journey.fuelConsumed?.toFixed(2) ?? "—") : "—"}
                   unit="t"
-                  sub={route && journey ? `${route.fuel.toFixed(1)} t total · ${journey.co2Consumed.toFixed(1)} t CO₂` : "No route calculated"}
+                  sub={route && journey ? `${journey.totalFuel?.toFixed(1) ?? "—"} t total · ${(journey.co2Consumed?.toFixed(1) ?? "—")} t CO₂` : "No route calculated"}
                   icon={BarChart3}
                 />
                 <Stat
                   label="Whale assessment"
-                  value={whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"}
+                  value={!currentPlan ? "—" : journey?.protection != null ? Math.round(journey.protection) : "N/A"}
                   unit={whaleAssessed(route, inputs) ? "/100" : ""}
                   sub={route && journey
                     ? `${whaleAssessed(route, inputs) ? "Whole route · higher is better" : "No habitat data"}`
@@ -860,7 +862,7 @@ export default function App() {
                       <summary><span><strong>Cargo manifest</strong><small>{manifest.length === 1 ? manifest[0].name : `${manifest.length} items`} · {Number(inputs.weight).toLocaleString()} t</small></span><Plus size={16} aria-hidden="true" /></summary>
                       <div className="disclosure-content">
                     <CargoPicker products={catalog.cargo_products || []} profiles={catalog.cargo_types}
-                      items={manifest} onChange={setManifest} results={route?.cargo_results} calculating={calculating} />
+                      items={manifest} onChange={setManifest} results={route?.cargo_results} calculating={!currentPlan} />
                       </div>
                     </details>
                     <details className="planner-disclosure deadline-editor">
@@ -881,7 +883,8 @@ export default function App() {
                       }
                     />
                     <div className="arrival-scale"><span>1 hour</span><span>90 days</span></div>
-                    <small className="cargo-hint">A maximum time allowance. Earlier arrival is allowed; the planner chooses the path and speed.</small>
+                    <small className="cargo-hint">Maximum time at sea.</small>
+                    {currentPlan && route && <small className="cargo-hint" role="status">Sailing: {formatDuration(journey?.totalHours ?? route.hours)} · {route.feasible ? `${formatDuration(Math.max(0, route.slack_hours))} before deadline` : "Deadline cannot be met"}</small>}
                     <Field label="Deadline from departure (hours)" type="number" min="1" max="2160" step="1"
                       value={inputs.arrival_window} onChange={(event) => change("arrival_window", Number(event.target.value))} />
                       </div>

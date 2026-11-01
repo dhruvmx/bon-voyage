@@ -25,9 +25,13 @@ export function manifestInputs(inputs, items) {
 export function manifestError(items) {
   if (!items.length) return "Add at least one cargo item to plan a passage.";
   if (items.length > MAX_CARGO_ITEMS) return "A ship can carry up to 10 cargo items in this planner.";
+  const names = new Set();
   for (const item of items) {
     if (!item.name?.trim()) return "Every cargo item needs a name.";
-    if (!Number.isFinite(item.weight) || item.weight < 0.001) return `Enter a weight of at least 0.001 tonnes for ${item.name}.`;
+    const name = item.name.trim().toLowerCase();
+    if (names.has(name)) return `${item.name} is already in the manifest.`;
+    names.add(name);
+    if (!Number.isFinite(item.weight) || item.weight < 0.001 || item.weight > 100000) return `Enter a weight of at least 0.001 tonnes for ${item.name}.`;
     if (!Number.isFinite(item.temperature) || item.temperature < -30 || item.temperature > 40) return `Set ${item.name}'s temperature between −30 and 40°C.`;
     if (!Number.isFinite(item.shelf_life) || item.shelf_life < 0.001 || item.shelf_life > 100000) return `Enter a valid shelf life for ${item.name}.`;
     if (!Number.isFinite(item.cargo_age) || item.cargo_age < 0 || item.cargo_age > 100000) return `Enter a valid cargo age for ${item.name}.`;

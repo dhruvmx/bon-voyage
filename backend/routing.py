@@ -9,7 +9,7 @@ from threading import Lock
 from types import SimpleNamespace
 from .cargo_catalog import PRODUCT_BY_ID
 from .cargo_model import MODEL_VERSION, evaluate_cargo, product_model
-from .optimizer import search_passages, OPTIMIZER_VERSION
+from .optimizer import search_passages, OPTIMIZER_VERSION, HABITAT_REFERENCE_NM
 from datetime import datetime, timedelta, timezone
 
 try:
@@ -213,7 +213,9 @@ def materialize_route(candidate,mode,p,california,reference_fuel):
     segments=[]
     for segment in path['segments']:
         segment_speed=candidate['zone_speed'] if segment['zone'] else speed
-        segments.append({**segment,'speed':segment_speed,'hours':segment['distance']/segment_speed})
+        duration=segment['distance']/segment_speed
+        fuel=p.fuel_per_day/24*(segment_speed/18)**3*duration
+        segments.append({**segment,'speed':segment_speed,'hours':duration,'fuel':fuel,'co2':fuel*3.114})
     return {
         'id':mode,'name':names[mode],'path_id':path['id'],'path_name':path['name'],
         'distance':round(path['distance'],2),'protected_distance':round(path['protected_distance'],2),
@@ -229,6 +231,8 @@ def materialize_route(candidate,mode,p,california,reference_fuel):
         'newly_expired_tonnes':candidate['newly_expired_tonnes'],
         'cargo_model_version':MODEL_VERSION,'optimizer_version':OPTIMIZER_VERSION,
         'coordinates':path['coordinates'],'segments':segments,
+        'calculation':{'fuel_tonnes_per_day_at_18_knots':p.fuel_per_day,'fuel_reference_speed_knots':18,'co2_per_tonne_fuel':3.114,
+                       'habitat_reference_nm':HABITAT_REFERENCE_NM,'habitat_exposure':path['whale_distance']*(candidate['zone_speed']/10)**2*p.whale_activity if california else None},
     }
 
 

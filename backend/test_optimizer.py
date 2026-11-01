@@ -31,6 +31,21 @@ class OptimizerTests(unittest.TestCase):
         self.assertFalse(seven['optimization']['deadline_binding'])
         self.assertEqual(seven['deadline_at'],'2026-11-08T00:00:00+00:00')
 
+    def test_seven_day_allowance_does_not_pad_a_three_day_passage(self):
+        from backend.routing import materialize_route
+        p=PlanInput(departure='2026-11-01T00:00:00Z',arrival_window=168,min_speed=18,max_speed=18,
+                    cargo_items=[{'product_id':'computers'}])
+        path={'id':'three-days','name':'Test passage','distance':1296,'open_distance':1296,
+              'protected_distance':0,'whale_distance':0,'coordinates':[[0,0],[0,21.6]],
+              'segments':[{'from':[0,0],'to':[0,21.6],'zone':None,'distance':1296,'kind':'open'}]}
+        choices,metadata=search_passages([path],p,cargo_outcomes(p,0),False)
+        route=materialize_route(choices['balanced'],'balanced',p,False,metadata['reference_fuel_tonnes'])
+        self.assertEqual(route['hours'],72)
+        self.assertEqual(route['slack_hours'],96)
+        self.assertEqual(route['eta'],'2026-11-04T00:00:00+00:00')
+        self.assertAlmostEqual(sum(s['fuel'] for s in route['segments']),route['fuel'],places=4)
+        self.assertAlmostEqual(sum(s['co2'] for s in route['segments']),route['co2'],places=4)
+
     def test_tight_deadline_speeds_up_and_impossible_deadline_is_explicit(self):
         loose=self.plan(arrival_window=168)
         tight=self.plan(arrival_window=30)

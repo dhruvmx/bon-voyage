@@ -718,3 +718,15 @@ dialog.workspace-search > .workspace-search-empty { padding: 24px 20px; margin: 
 .dashboard-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .dashboard-heading h2 { margin-bottom: 0; }
 .dashboard-heading .dashboard-status { margin: 0; padding: 3px 8px; border-radius: 5px; background: var(--tint); color: var(--muted); font-size: 11px; }
+
+/* Cargo rows remain reachable after selecting a product. */
+.cargo-browse { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 8px; }
+.manifest-items { max-height: none; overflow: visible; scrollbar-gutter: auto; }
+.manifest-item summary { padding-right: 58px; min-height: 68px; }
+.manifest-item summary > span { min-width: 0; flex: 1; }
+.manifest-item summary > svg { flex-shrink: 0; }
+.manifest-remove { top: 10px; right: 5px; width: 44px; height: 44px; }
+.manifest-fields { grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); align-items: end; }
+.manifest-fields .field { min-width: 0; }
+.manifest-fields :is(input, select), .cargo-model select { min-width: 0; width: 100%; font-size: 16px; min-height: 44px; }
+.manifest-fields .field > span { display: block; min-height: 2.5em; }

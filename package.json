@@ -15,7 +15,8 @@
     "test:planner": "node tests/browser-planner.cjs",
     "test:dialogs": "node tests/browser-dialogs.cjs",
     "test:search": "node tests/browser-search.cjs",
-    "test:heading": "node tests/browser-heading.cjs"
+    "test:heading": "node tests/browser-heading.cjs",
+    "test:cargo": "node tests/browser-cargo.cjs"
   },
   "dependencies": {
     "jspdf": "^4.2.1",

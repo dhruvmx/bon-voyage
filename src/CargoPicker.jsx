@@ -2,6 +2,18 @@ import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Plus, Search, X } from "lucide-react";
 import { MAX_CARGO_ITEMS, profileNames } from "./cargo";
 
+// Keep the text being edited separate from unit conversion to hours.
+function CargoNumber({ value, divisor = 1, onValue, ...props }) {
+  const [editing, setEditing] = useState(false), [draft, setDraft] = useState("");
+  const numeric = value / divisor;
+  const boundary = numeric === Number(props.min) || numeric === Number(props.max);
+  const display = value === "" ? "" : String(boundary ? numeric : Number(numeric.toPrecision(12)));
+  return <input {...props} type="number" step="any" value={editing ? draft : display}
+    onFocus={() => { setDraft(display); setEditing(true); }}
+    onBlur={() => setEditing(false)}
+    onChange={(event) => { const raw = event.target.value; setDraft(raw); onValue(raw === "" ? "" : Number(raw) * divisor); }} />;
+}
+
 export default memo(function CargoPicker({ products, profiles, items, onChange, results: cargoResults, calculating }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -16,7 +28,6 @@ export default memo(function CargoPicker({ products, profiles, items, onChange, 
   const added = (product) => items.some((item) => item.product_id === product.id || item.name.toLowerCase() === product.name.toLowerCase());
   const exact = products.some((product) => product.name.toLowerCase() === query.trim().toLowerCase());
   const customDuplicate = custom && items.some((item) => item.name.toLowerCase() === custom.name.trim().toLowerCase());
-  const numberInput = (value, multiplier = 1) => value === "" ? "" : Number(value) * multiplier;
 
   useEffect(() => {
     if (open) list.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
@@ -34,8 +45,8 @@ export default memo(function CargoPicker({ products, profiles, items, onChange, 
     onChange([...items, { product_id: product.id, name: product.name, profile: product.profile,
       weight: 10, temperature: product.temperature, shelf_life: product.shelf_life, cargo_age: 0, routing_priority: "auto" }]);
     setNotice(`${product.name} added.`); setQuery(""); setActive(0);
-    if (items.length + 1 === MAX_CARGO_ITEMS) setOpen(false);
-    else input.current?.focus();
+    setOpen(false);
+    input.current?.blur();
   }
 
   function update(index, key, value) {
@@ -57,6 +68,7 @@ export default memo(function CargoPicker({ products, profiles, items, onChange, 
           onFocus={() => setOpen(true)}
           onChange={(event) => { setQuery(event.target.value); setActive(0); setOpen(true); }}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
             if (event.key === "Escape") { event.preventDefault(); setOpen(false); }
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault(); setOpen(true);
@@ -64,7 +76,7 @@ export default memo(function CargoPicker({ products, profiles, items, onChange, 
             }
             if (event.key === "Enter" && open && results[active]) { event.preventDefault(); add(results[active]); }
           }} />
-        <ChevronDown size={15} aria-hidden="true" />
+        <button type="button" className="cargo-browse" aria-label="Browse cargo" aria-expanded={open && !full} disabled={full} onClick={() => { setOpen((value) => !value); }}><ChevronDown size={15} aria-hidden="true" /></button>
       </div>
       {open && !full && <div className="cargo-dropdown">
         <ul id={`${id}-list`} role="listbox" aria-label="Cargo products" aria-multiselectable="true" ref={list}>
@@ -110,20 +122,20 @@ export default memo(function CargoPicker({ products, profiles, items, onChange, 
         return <article className="manifest-item" key={item.product_id || `custom-${item.name}`}>
         <details><summary><span><b>{item.name}</b><small>{item.weight || 0} t · {profileNames[item.profile]}</small></span><ChevronDown size={15} aria-hidden="true" /></summary>
           <div className="manifest-fields">
-            <label className="field"><span>Weight (tonnes)</span><input aria-label={`${item.name} weight (tonnes)`} type="number" min="0.001" max="100000" step="any" value={item.weight}
-              onChange={(event) => update(index, "weight", numberInput(event.target.value))} /></label>
+            <label className="field"><span>Weight (tonnes)</span><CargoNumber aria-label={`${item.name} weight (tonnes)`} type="number" min="0.001" max="100000" step="any" value={item.weight}
+              onValue={(value) => update(index, "weight", value)} /></label>
             {!item.product_id && <label className="field"><span>Perishability</span><select aria-label={`${item.name} perishability`} value={item.profile} onChange={(event) => {
               const profile = event.target.value;
               onChange(items.map((cargo, i) => i === index ? { ...cargo, profile,
                 temperature: profiles[profile].temperature, shelf_life: profiles[profile].shelf, routing_priority: "auto" } : cargo));
             }}>{Object.entries(profileNames).map(([value, name]) => <option key={value} value={value}>{name}</option>)}</select></label>}
             {item.profile !== "electronics" && <>
-              <label className="field"><span>Temperature (°C)</span><input aria-label={`${item.name} temperature (°C)`} type="number" min="-30" max="40" step="any" value={item.temperature}
-                onChange={(event) => update(index, "temperature", numberInput(event.target.value))} /></label>
-              <label className="field"><span>Shelf life (days)</span><input aria-label={`${item.name} shelf life (days)`} type="number" min="0.01" max="4166.66" step="any" value={item.shelf_life === "" ? "" : Number((item.shelf_life / 24).toFixed(4))}
-                onChange={(event) => update(index, "shelf_life", numberInput(event.target.value, 24))} /></label>
-              <label className="field"><span>Cargo age (days)</span><input aria-label={`${item.name} age (days)`} type="number" min="0" max="4166.66" step="any" value={item.cargo_age === "" ? "" : Number((item.cargo_age / 24).toFixed(4))}
-                onChange={(event) => update(index, "cargo_age", numberInput(event.target.value, 24))} /></label>
+              <label className="field"><span>Temperature (°C)</span><CargoNumber aria-label={`${item.name} temperature (°C)`} type="number" min="-30" max="40" step="any" value={item.temperature}
+                onValue={(value) => update(index, "temperature", value)} /></label>
+              <label className="field"><span>Shelf life (days)</span><CargoNumber divisor={24} aria-label={`${item.name} shelf life (days)`} type="number" min={0.001 / 24} max={100000 / 24} step="any" value={item.shelf_life}
+                onValue={(value) => update(index, "shelf_life", value)} /></label>
+              <label className="field"><span>Cargo age (days)</span><CargoNumber divisor={24} aria-label={`${item.name} age (days)`} type="number" min="0" max={100000 / 24} step="any" value={item.cargo_age}
+                onValue={(value) => update(index, "cargo_age", value)} /></label>
             </>}
           </div>
           <div className="cargo-model">
