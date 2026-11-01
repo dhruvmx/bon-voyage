@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { positionAtProgress } from "./voyagePosition";
 import "leaflet/dist/leaflet.css";
-import { Layers, LocateFixed, Pause, Play } from "lucide-react";
+import { Layers, LocateFixed, Pause, Play, RefreshCw } from "lucide-react";
 
 export default function VoyageMap({
   route,
@@ -15,13 +15,18 @@ export default function VoyageMap({
   setProgress,
   playing,
   setPlaying,
+  calculating = false,
 }) {
   const host = useRef(null),
     map = useRef(null),
     overlays = useRef(null),
     ship = useRef(null),
     initialBounds = useRef(null),
-    routeLines = useRef([]);
+    routeLines = useRef([]),
+    // Track which world copy offsets have been rendered for the base map layers
+    renderedCopies = useRef(new Set()),
+    coastlineData = useRef(null),
+    baseLayerGroup = useRef(null);
 
   const [layers, setLayers] = useState({
     habitat: true,
@@ -30,6 +35,7 @@ export default function VoyageMap({
   });
   const [showLayers, setShowLayers] = useState(false);
   const [tileError, setTileError] = useState(false);
+  const [coastlineLoading, setCoastlineLoading] = useState(true);
 
   useEffect(() => {
     if (!host.current || map.current) return;
@@ -55,6 +61,7 @@ export default function VoyageMap({
 
     map.current = instance;
     overlays.current = L.layerGroup().addTo(instance);
+    baseLayerGroup.current = L.layerGroup().addTo(instance);
 
     instance.createPane("land");
     instance.getPane("land").style.zIndex = 220;
@@ -84,58 +91,14 @@ export default function VoyageMap({
       fillOpacity: 1,
     };
 
-    fetch("/coastline.geojson")
-      .then((r) => {
-        if (!r.ok) throw new Error("Coastline unavailable");
-        return r.json();
-      })
-      .then((data) => {
-        if (!active) return;
-        // Render coastline at three world copies for infinite horizontal scroll
-        [-360, 0, 360].forEach((offset) => {
-          const gj = offset === 0 ? data : shiftGeoJSON(data, offset);
-          L.geoJSON(gj, {
-            pane: "land",
-            interactive: false,
-            style: coastlineStyle,
-          }).addTo(instance);
-        });
-      })
-      .catch(() => active && setTileError(true));
-
-    instance.attributionControl.addAttribution(
-      '<a href="https://www.naturalearthdata.com/">Natural Earth</a> · Public domain'
-    );
-
-    // Global latitude and longitude grid lines (across all world copies)
     const gridStyle = {
       color: "var(--map-grid)",
       weight: 0.5,
       opacity: 0.6,
       interactive: false,
     };
-    for (let lat = -60; lat <= 60; lat += 30) {
-      L.polyline(
-        [
-          [lat, -540],
-          [lat, 540],
-        ],
-        gridStyle
-      ).addTo(instance);
-    }
-    for (let offset = -360; offset <= 360; offset += 360) {
-      for (let lon = -180; lon <= 180; lon += 30) {
-        L.polyline(
-          [
-            [-80, lon + offset],
-            [80, lon + offset],
-          ],
-          gridStyle
-        ).addTo(instance);
-      }
-    }
 
-    // Key international port and ocean labels (replicated across world copies)
+    // Key international port and ocean labels
     const labels = [
       ["PACIFIC OCEAN", 0, -160, "ocean"],
       ["ATLANTIC OCEAN", 0, -30, "ocean"],
@@ -146,7 +109,35 @@ export default function VoyageMap({
       ["Los Angeles", 33.74, -118.27, "city"],
     ];
 
-    [-360, 0, 360].forEach((offset) =>
+    // Render base map layers (coastline, grid, labels) for a single world copy offset
+    const renderWorldCopy = (offset, coastData) => {
+      if (!active) return;
+      if (renderedCopies.current.has(offset)) return;
+      renderedCopies.current.add(offset);
+      const group = baseLayerGroup.current;
+
+      // Coastline
+      if (coastData) {
+        const gj = offset === 0 ? coastData : shiftGeoJSON(coastData, offset);
+        L.geoJSON(gj, {
+          pane: "land",
+          interactive: false,
+          style: coastlineStyle,
+        }).addTo(group);
+      }
+
+      // Vertical grid lines for this world copy
+      for (let lon = -180; lon <= 180; lon += 30) {
+        L.polyline(
+          [
+            [-80, lon + offset],
+            [80, lon + offset],
+          ],
+          gridStyle
+        ).addTo(group);
+      }
+
+      // Labels for this world copy
       labels.forEach(([name, lat, lon, type]) =>
         L.marker([lat, lon + offset], {
           pane: "markerPane",
@@ -157,24 +148,95 @@ export default function VoyageMap({
             iconSize: [140, 18],
             iconAnchor: [0, 9],
           }),
-        }).addTo(instance)
-      )
+        }).addTo(group)
+      );
+    };
+
+    // Determine which world copy offsets are needed for the current viewport
+    const getNeededOffsets = () => {
+      const bounds = instance.getBounds();
+      const west = bounds.getWest();
+      const east = bounds.getEast();
+      // Which 360-wide world copies overlap with the viewport
+      const minCopy = Math.floor((west + 180) / 360);
+      const maxCopy = Math.ceil((east - 180) / 360);
+      const offsets = [];
+      for (let i = minCopy - 1; i <= maxCopy + 1; i++) {
+        offsets.push(i * 360);
+      }
+      return offsets;
+    };
+
+    // Ensure all visible world copies are rendered
+    const ensureWorldCopies = () => {
+      const needed = getNeededOffsets();
+      const data = coastlineData.current;
+      needed.forEach((offset) => renderWorldCopy(offset, data));
+    };
+
+    // Horizontal latitude grid lines span a very wide range
+    for (let lat = -60; lat <= 60; lat += 30) {
+      L.polyline(
+        [
+          [lat, -5400],
+          [lat, 5400],
+        ],
+        gridStyle
+      ).addTo(baseLayerGroup.current);
+    }
+
+    // Load coastline and render initial copies
+    fetch("/coastline.geojson")
+      .then((r) => {
+        if (!r.ok) throw new Error("Coastline unavailable");
+        return r.json();
+      })
+      .then((data) => {
+        if (!active) return;
+        coastlineData.current = data;
+        setCoastlineLoading(false);
+        // Render initial world copies plus any the viewport already needs
+        [-360, 0, 360].forEach((offset) => renderWorldCopy(offset, data));
+        ensureWorldCopies();
+      })
+      .catch(() => {
+        if (!active) return;
+        setCoastlineLoading(false);
+        setTileError(true);
+        // Still render grid/labels for initial copies even without coastline
+        [-360, 0, 360].forEach((offset) => renderWorldCopy(offset, null));
+      });
+
+    instance.attributionControl.addAttribution(
+      '<a href="https://www.naturalearthdata.com/">Natural Earth</a> · Public domain'
     );
+
+    // Dynamically load more world copies as the user pans.
+    // Listen on both "move" (fires continuously during pan) and "moveend"
+    // so the map renders immediately while panning, not just after stopping.
+    instance.on("move", ensureWorldCopies);
+    instance.on("moveend", ensureWorldCopies);
 
     const resize = new ResizeObserver(() => { if (active) instance.invalidateSize(); });
     resize.observe(host.current);
 
     return () => {
       active = false;
+      instance.off("move", ensureWorldCopies);
+      instance.off("moveend", ensureWorldCopies);
       resize.disconnect();
       instance.remove();
       map.current = null;
+      renderedCopies.current = new Set();
+      coastlineData.current = null;
+      baseLayerGroup.current = null;
     };
   }, []);
 
   useEffect(() => {
     if (!map.current) return;
     if (!route) { overlays.current.clearLayers(); ship.current = null; return; }
+    const instance = map.current;
     const group = overlays.current;
     group.clearLayers();
     routeLines.current = [];
@@ -183,10 +245,15 @@ export default function VoyageMap({
     const shiftPt = (pt, offset) => [pt[0], pt[1] + offset];
     const shiftCoords = (coords, offset) => coords.map((pt) => shiftPt(pt, offset));
 
-    // World copy offsets for infinite horizontal scroll
-    const worldOffsets = [-360, 0, 360];
+    // Track which route overlay offsets have been rendered
+    const renderedRouteOffsets = new Set();
+    const animationTimers = [];
 
-    worldOffsets.forEach((offset) => {
+    // Render route overlays for a single world copy offset
+    const renderRouteAtOffset = (offset, animate) => {
+      if (renderedRouteOffsets.has(offset)) return;
+      renderedRouteOffsets.add(offset);
+
       // Protection / habitat zones
       zones
         .filter((z) => layers[z.kind === "vsr" ? "vsr" : "habitat"])
@@ -231,10 +298,35 @@ export default function VoyageMap({
       const line = L.polyline(shiftCoords(route.coordinates, offset), {
         color: "var(--route-color)",
         weight: 5,
+        className: "route-passage-line",
       })
         .bindTooltip(`${route.name} · ${route.speed} kn open water`)
         .addTo(group);
       routeLines.current.push(line);
+
+      if (animate && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const el = line.getElement();
+        if (el && typeof el.getTotalLength === "function") {
+          try {
+            const length = Math.ceil(el.getTotalLength());
+            if (length > 0) {
+              el.style.strokeDasharray = `${length}`;
+              el.style.strokeDashoffset = `${length}`;
+              void el.getBoundingClientRect();
+              el.style.transition = "stroke-dashoffset 0.85s cubic-bezier(0.16, 1, 0.3, 1)";
+              el.style.strokeDashoffset = "0";
+              const timer = setTimeout(() => {
+                if (el) {
+                  el.style.strokeDasharray = "";
+                  el.style.strokeDashoffset = "";
+                  el.style.transition = "";
+                }
+              }, 900);
+              animationTimers.push(timer);
+            }
+          } catch (_) {}
+        }
+      }
 
       // Protected transit segments
       let chunk = [],
@@ -270,7 +362,30 @@ export default function VoyageMap({
           })
           .addTo(group)
       );
-    });
+    };
+
+    // Compute which world copy offsets the viewport needs
+    const getNeededOffsets = () => {
+      const bounds = instance.getBounds();
+      const west = bounds.getWest();
+      const east = bounds.getEast();
+      const minCopy = Math.floor((west + 180) / 360);
+      const maxCopy = Math.ceil((east - 180) / 360);
+      const offsets = [];
+      for (let i = minCopy - 1; i <= maxCopy + 1; i++) {
+        offsets.push(i * 360);
+      }
+      return offsets;
+    };
+
+    const ensureRouteOverlays = () => {
+      const needed = getNeededOffsets();
+      needed.forEach((offset) => renderRouteAtOffset(offset, false));
+    };
+
+    // Render initial world copies with animation, then ensure viewport coverage
+    [-360, 0, 360].forEach((offset) => renderRouteAtOffset(offset, true));
+    ensureRouteOverlays();
 
     // Ship marker only on center copy (worldCopyJump keeps it visible)
     ship.current = L.marker(route.coordinates[0], {
@@ -292,6 +407,17 @@ export default function VoyageMap({
       map.current.fitBounds(L.latLngBounds(route.coordinates).pad(0.15), { animate: false });
       initialBounds.current = key;
     }
+
+    // Listen for panning to dynamically add route overlays for new world copies.
+    // Use both "move" and "moveend" so overlays appear during panning, not just after.
+    instance.on("move", ensureRouteOverlays);
+    instance.on("moveend", ensureRouteOverlays);
+
+    return () => {
+      animationTimers.forEach(clearTimeout);
+      instance.off("move", ensureRouteOverlays);
+      instance.off("moveend", ensureRouteOverlays);
+    };
   }, [route, routes, zones, color, layers]);
 
   useEffect(() => {
@@ -327,12 +453,21 @@ export default function VoyageMap({
           <Layers size={14} /> Map layers
         </button>
       </div>
-      <div className="map-wrap">
+      <div className="map-wrap" aria-busy={calculating || coastlineLoading}>
         <div
           className="map"
           ref={host}
           aria-label="Interactive maritime route map"
         />
+        {calculating && (
+          <div className="map-loading-indicator" role="status" aria-label="Calculating route">
+            <div className="map-loading-bar" />
+            <div className="map-loading-pill">
+              <RefreshCw size={13} className="map-spin-icon" aria-hidden="true" />
+              <span>Calculating passage…</span>
+            </div>
+          </div>
+        )}
         {showLayers && (
           <div className="layer-menu">
             {[
@@ -353,12 +488,20 @@ export default function VoyageMap({
             ))}
           </div>
         )}
-        <span className="map-badge" role="status">
-          ● {route?.name || "Calculating passage…"}
+        <span className="map-badge" role="status" aria-live="polite">
+          {calculating ? (
+            <span className="map-badge-calculating">
+              <span className="map-badge-spinner" aria-hidden="true" />
+              <span>Calculating passage…</span>
+            </span>
+          ) : (
+            <>● {route?.name || (coastlineLoading ? "Loading map data…" : "Calculating passage…")}</>
+          )}
         </span>
         <button
           className="recenter"
           aria-label="Recenter map"
+          disabled={!route || calculating}
           onClick={() =>
             route &&
             map.current?.fitBounds(
@@ -402,7 +545,7 @@ export default function VoyageMap({
         <button
           className="play-button"
           aria-label={playing ? "Pause voyage" : "Play voyage"}
-          disabled={!route}
+          disabled={!route || calculating}
           onClick={() => {
             if (progress >= 100) setProgress(0);
             setPlaying(!playing);
@@ -415,12 +558,14 @@ export default function VoyageMap({
             {progress >= 100 ? "Arrived at destination" : "Voyage preview"}
           </strong>
           <small>
-            {route
-              ? `${((route.hours * progress) / 100).toFixed(1)} h elapsed · ${(
-                  route.hours *
-                  (1 - progress / 100)
-                ).toFixed(1)} h remaining`
-              : "Waiting for route"}
+            {calculating
+              ? "Updating passage…"
+              : route
+                ? `${((route.hours * progress) / 100).toFixed(1)} h elapsed · ${(
+                    route.hours *
+                    (1 - progress / 100)
+                  ).toFixed(1)} h remaining`
+                : "Waiting for route"}
           </small>
         </div>
         <input

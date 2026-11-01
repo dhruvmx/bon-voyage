@@ -1,4 +1,4 @@
-import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { cloneElement, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -24,7 +24,8 @@ import {
   Search,
 } from "lucide-react";
 import { api, download, getSessionVersion } from "./api";
-import VoyageMap from "./Map";
+import RouteMapSkeleton from "./MapSkeleton";
+const VoyageMap = lazy(() => import("./Map"));
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
 import Intro from "./Intro";
@@ -742,18 +743,21 @@ export default function App() {
               </section>
               <div className="planner-grid">
                 <div className="passage-preview" ref={preview}>
-                  <VoyageMap
-                    highlightToken={routeHighlight}
-                    route={route}
-                    routes={result?.routes || []}
-                    zones={catalog.zones}
-                    color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"}
-                    coverage={result?.data_coverage}
-                    progress={progress}
-                    setProgress={setProgress}
-                    playing={playing}
-                    setPlaying={setPlaying}
-                  />
+                  <Suspense fallback={<RouteMapSkeleton color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"} />}>
+                    <VoyageMap
+                      highlightToken={routeHighlight}
+                      route={route}
+                      routes={result?.routes || []}
+                      zones={catalog.zones}
+                      color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"}
+                      coverage={result?.data_coverage}
+                      progress={progress}
+                      setProgress={setProgress}
+                      playing={playing}
+                      setPlaying={setPlaying}
+                      calculating={calculating}
+                    />
+                  </Suspense>
                   <RouteComparison result={result} selected={selected} calculating={calculating} onSelect={showRouteOnMap} onShowMap={() => showRouteOnMap()} />
                 </div>
                 <section className="panel config">
