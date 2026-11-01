@@ -550,8 +550,9 @@ export default function App() {
               onClick={() => switchView(id)}
             >
               <Icon size={18} />
-              <span>{label}</span>
-              {id === "voyages" && <b>{stats?.total ?? voyages.length}</b>}
+              <span className="nav-label-desktop">{label}</span>
+              <span className="nav-label-mobile">{{ planner: "Planner", voyages: "Voyages", fleet: "Fleet", insights: "Impact" }[id]}</span>
+              {id === "voyages" && <b data-empty={(stats?.total ?? voyages.length) === 0}>{stats?.total ?? voyages.length}</b>}
             </button>
           ))}
         </nav>
@@ -563,11 +564,11 @@ export default function App() {
           }}
         >
           <span className="avatar">
-            {user ? initials(user.name) : <User size={18} />}
+            {initials(user?.name || "John Doe")}
           </span>
           <span>
-            <strong>{user?.name || "Your workspace"}</strong>
-            <small>{user?.role || "Log in / sign up"}</small>
+            <strong>{user?.name || "John Doe"}</strong>
+            <small>{user?.role || "Guest · log in / sign up"}</small>
           </span>
           <Settings size={15} />
         </button>
