@@ -66,9 +66,13 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     await page.getByRole('button', { name: 'Export voyage', exact: true }).click();
     const download = await downloading;
     const fs = require('node:fs');
-    const exported = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
-    assert.equal(exported.route.id, 'direct');
-    assert.equal(exported.inputs.cargo_items.length, 3);
+    const exported = fs.readFileSync(await download.path());
+    assert(download.suggestedFilename().endsWith('.pdf'));
+    assert.equal(exported.subarray(0, 5).toString(), '%PDF-');
+    const report = exported.toString('latin1');
+    assert(report.includes('Fastest feasible arrival'));
+    assert(report.includes('Demo crates'));
+    assert(report.includes('Data coverage and optimization'));
     await page.locator('.planner-report > summary').click();
     await page.locator('.compare-disclosure > summary').click();
 

@@ -58,11 +58,7 @@ export async function api(path, options = {}) {
     signal?.removeEventListener("abort", cancel);
   }
 }
-export function download(data, filename = "bon-voyage.json") {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+export async function download(data) {
+  const { saveVoyagePdf } = await import('./voyagePdf');
+  saveVoyagePdf(data);
 }

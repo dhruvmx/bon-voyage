@@ -13,7 +13,7 @@ export const features = [
   feature('layers', 'Map layers', 'Ports, whale habitats and routing overlays', 'coverage protected zones'),
   feature('coverage', 'Data sources & coverage', 'Understand the data behind the route', 'live modeled limitations'),
   feature('save', 'Save this passage', 'Save or update your current voyage', 'account saved'),
-  feature('export', 'Export voyage', 'Download the current passage as JSON', 'download file'),
+  feature('export', 'Export voyage', 'Download a complete voyage PDF report', 'download file'),
   feature('voyages', 'My voyages', 'Browse and search saved passages', 'history saved trips'),
   feature('fleet', 'My fleet', 'Manage your vessels', 'ships boats'),
   feature('add-vessel', 'Add a vessel', 'Register a ship in your fleet', 'new boat capacity imo'),

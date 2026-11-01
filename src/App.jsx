@@ -273,9 +273,14 @@ export default function App() {
       if (n === listRequest.current && owner === account.current) setDataError(e.message);
     } finally { paging.current = false; setLoadingMore(""); }
   }
+  function exportReport(data) {
+    const id = Object.hasOwn(data, "vessel_id") ? data.vessel_id : vesselId;
+    return download({ name: voyageName, notes, status: voyageStatus, ...data, ports: catalog?.ports,
+      vessel: data.vessel || vessels.find((ship) => ship.id === id) }).catch((error) => setDataError(`PDF export failed: ${error.message}`));
+  }
   async function exportVoyage(v) {
     const owner = account.current;
-    try { const full = await api(`/voyages/${v.id}`); if (owner === account.current) download(full); }
+    try { const full = await api(`/voyages/${v.id}`); if (full.vessel_id) { try { full.vessel = await api(`/vessels/${full.vessel_id}`); } catch (e) { if (e.status !== 404) throw e; } } if (owner === account.current) exportReport(full); }
     catch (e) { setDataError(e.message); }
   }
   useEffect(() => {
@@ -543,7 +548,7 @@ export default function App() {
     if (action === "layers") { revealPlanner(".map-panel"); requestAnimationFrame(() => { if (!document.querySelector(".layer-menu")) document.querySelector('[aria-label="Map layers"]')?.click(); }); return; }
     if (action === "save") { openSaveDialog(); return; }
     if (action === "export") {
-      if (ready) download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at });
+      if (ready) exportReport({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at });
       else notify("Wait for a valid passage before exporting.");
       return;
     }
@@ -702,7 +707,7 @@ export default function App() {
                 aria-label="Export voyage" title="Export voyage"
                 disabled={!ready}
                 onClick={() =>
-                  download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at })
+                  exportReport({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at })
                 }
               >
                 <Download size={15} /><span className="export-label">Export voyage</span>

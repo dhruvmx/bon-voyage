@@ -17,14 +17,15 @@
     "test:search": "node tests/browser-search.cjs"
   },
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
+    "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
-    "lucide-react": "^0.468.0"
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "vite": "^7.1.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "playwright": "^1.64.1"
+    "playwright": "^1.64.1",
+    "vite": "^7.1.0"
   }
 }
