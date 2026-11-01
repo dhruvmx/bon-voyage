@@ -72,7 +72,7 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     const report = exported.toString('latin1');
     assert(report.includes('Fastest feasible arrival'));
     assert(report.includes('Demo crates'));
-    assert(report.includes('Data coverage and optimization'));
+    assert(report.includes('VOYAGE BRIEF'));
     await page.locator('.planner-report > summary').click();
     await page.locator('.compare-disclosure > summary').click();
 
