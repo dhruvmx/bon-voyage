@@ -56,3 +56,4 @@ jobs:
       - run: npm run test:intro
       - run: npm run test:dialogs
       - run: npm run test:search
+      - run: npm run test:heading

@@ -22,3 +22,13 @@ test('zero-time segments, bounds and missing segments do not leave a stale posit
   assert.deepEqual(positionAtProgress(route,101),[0,40]);
   assert.deepEqual(positionAtProgress({...route,segments:[]},100),[0,40]);
 });
+
+test('projected direction matches east-west lines at high latitude and unwraps north turns', async () => {
+  const { headingAtProgress, continuousHeading } = await import('./voyagePosition.js');
+  const east = { segments: [{ from: [70, 0], to: [70, 90], hours: 1 }] };
+  assert.equal(headingAtProgress(east, 50), 90);
+  assert.equal(headingAtProgress({ segments: [{ from: [70, 90], to: [70, 0], hours: 1 }] }, 50), 270);
+  assert.equal(continuousHeading(359, 1), 361);
+  assert.equal(continuousHeading(1, 359), -1);
+  assert.equal(continuousHeading(null, 45), 45);
+});

@@ -218,7 +218,11 @@
   .leaflet-tooltip-right::before { border-right-color: var(--border); }
   .geo-label { white-space: nowrap; font-size: 12px; color: var(--muted); pointer-events: none; }
   .geo-label.region, .geo-label.ocean { letter-spacing: 2px; }
-  .ship-marker span { display: grid; place-items: center; width: 32px; height: 32px; background: var(--accent); color: var(--accent-ink); border: 2px solid var(--surface); border-radius: 50%; font-size: 20px; transform: rotate(-35deg); }
+  .ship-marker { display: grid; place-items: center; border-radius: 50%; background: var(--surface); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent), transparent 80%), 0 2px 7px #0004; }
+  .ship-navigation-arrow { display: block; width: 32px; height: 32px; transform-origin: 50% 50%; transition: transform 180ms ease-out; }
+  .ship-navigation-arrow svg { display: block; overflow: visible; }
+  .ship-navigation-arrow path { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; stroke-linejoin: round; }
+  @media (prefers-reduced-motion: reduce) { .ship-navigation-arrow { transition: none; } }
   .map-badge, .layer-menu, .tile-error { position: absolute; z-index: 600; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 14px; font-size: 13px; }
   .map-badge { top: 14px; left: 54px; }
   .layer-menu { top: 14px; right: 14px; }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { positionAtProgress, headingAtProgress } from "./voyagePosition";
+import { positionAtProgress, headingAtProgress, continuousHeading } from "./voyagePosition";
 import "leaflet/dist/leaflet.css";
 import { Layers, LocateFixed, Pause, Play, RefreshCw } from "lucide-react";
 
@@ -21,12 +21,16 @@ export default function VoyageMap({
     map = useRef(null),
     overlays = useRef(null),
     ship = useRef(null),
+    shipHeading = useRef(null),
+    playbackProgress = useRef(progress),
     initialBounds = useRef(null),
     routeLines = useRef([]),
     // Track which world copy offsets have been rendered for the base map layers
     renderedCopies = useRef(new Set()),
     coastlineData = useRef(null),
     baseLayerGroup = useRef(null);
+
+  playbackProgress.current = progress;
 
   const [layers, setLayers] = useState({
     habitat: true,
@@ -388,11 +392,13 @@ export default function VoyageMap({
     ensureRouteOverlays();
 
     // Ship marker only on center copy (worldCopyJump keeps it visible)
-    ship.current = L.marker(route.coordinates[0], {
+    const heading = headingAtProgress(route, playbackProgress.current);
+    shipHeading.current = heading;
+    ship.current = L.marker(positionAtProgress(route, playbackProgress.current), {
       interactive: false,
       icon: L.divIcon({
         className: "ship-marker",
-        html: "<span>➤</span>",
+        html: `<span class="ship-navigation-arrow" style="transform:rotate(${heading}deg)"><svg viewBox="0 0 32 32" width="32" height="32" aria-hidden="true"><path d="M16 3 28 28 16 22 4 28Z" /></svg></span>`,
         iconSize: [34, 34],
         iconAnchor: [17, 17],
       }),
@@ -437,8 +443,10 @@ export default function VoyageMap({
   useEffect(() => {
     if (!ship.current || !route || !route.segments) return;
     ship.current.setLatLng(positionAtProgress(route, progress));
-    const arrow = ship.current.getElement()?.querySelector("span");
-    if (arrow) arrow.style.transform = `rotate(${headingAtProgress(route, progress) - 90}deg)`;
+    const arrow = ship.current.getElement()?.querySelector(".ship-navigation-arrow");
+    const heading = continuousHeading(shipHeading.current, headingAtProgress(route, progress));
+    shipHeading.current = heading;
+    if (arrow) arrow.style.transform = `rotate(${heading}deg)`;
   }, [progress, route, layers]);
 
   return (

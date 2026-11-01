@@ -17,15 +17,25 @@ export function positionAtProgress(route, progress) {
   return coordinates.at(-1);
 }
 
-// Compass bearing in degrees, independent of the icon artwork's orientation.
+// Match the straight route line in Leaflet's Web Mercator projection.
+// A great-circle initial bearing can point away from that line at high latitudes.
 export function headingAtProgress(route, progress) {
   const segments = (route.segments || []).filter((s) => s.hours > 0 && (s.from[0] !== s.to[0] || s.from[1] !== s.to[1]));
   if (!segments.length) return 0;
-  let target = segments.reduce((sum, s) => sum + s.hours, 0) * Math.max(0, Math.min(1, progress / 100));
+  const fraction = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress / 100)) : 0;
+  let target = segments.reduce((sum, s) => sum + s.hours, 0) * fraction;
   let segment = segments.at(-1);
   for (const candidate of segments) { if (target < candidate.hours) { segment = candidate; break; } target -= candidate.hours; }
   const radians = Math.PI / 180;
-  const lat1 = segment.from[0] * radians, lat2 = segment.to[0] * radians;
-  const delta = (segment.to[1] - segment.from[1]) * radians;
-  return (Math.atan2(Math.sin(delta) * Math.cos(lat2), Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(delta)) / radians + 360) % 360;
+  const mercatorY = (latitude) => Math.log(Math.tan(Math.PI / 4 + Math.max(-85.051129, Math.min(85.051129, latitude)) * radians / 2));
+  // Route longitudes are already unwrapped to the displayed world copy.
+  const x = (segment.to[1] - segment.from[1]) * radians;
+  const y = mercatorY(segment.to[0]) - mercatorY(segment.from[0]);
+  return (Math.atan2(x, y) / radians + 360) % 360;
+}
+
+// Keep consecutive CSS angles within 180 degrees, including crossing north.
+export function continuousHeading(previous, heading) {
+  if (!Number.isFinite(previous)) return heading;
+  return previous + ((heading - previous + 180) % 360 + 360) % 360 - 180;
 }
