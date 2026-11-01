@@ -1,4 +1,4 @@
-import { cloneElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { cloneElement, lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownUp,
   ArrowUpRight,
@@ -24,7 +24,8 @@ import {
   Search,
 } from "lucide-react";
 import { api, download, getSessionVersion } from "./api";
-import VoyageMap from "./Map";
+import RouteMapSkeleton from "./MapSkeleton";
+const VoyageMap = lazy(() => import("./Map"));
 import { journeyAtProgress } from "./journey";
 import RouteComparison from "./RouteComparison";
 import Appearance from "./Appearance";
@@ -1010,7 +1011,9 @@ export default function App() {
                   </div>
                 </section>
                 <div className="passage-preview" ref={preview}>
+                  <Suspense fallback={<RouteMapSkeleton color="var(--accent)" />}>
                   <VoyageMap
+                    calculating={calculating}
                     highlightToken={routeHighlight}
                     route={route}
                     routes={result?.routes || []}
@@ -1022,6 +1025,7 @@ export default function App() {
                     playing={playing}
                     setPlaying={setPlaying}
                   />
+                  </Suspense>
                   <details className="panel planner-disclosure compare-disclosure">
                     <summary><span><strong>Compare routes</strong><small>{result?.status === "infeasible" ? "Earliest available estimate" : `${result?.routes.length || 0} options · choose a different passage`}</small></span><Plus size={16} aria-hidden="true" /></summary>
                     <div className="disclosure-content"><RouteComparison result={result} selected={selected} calculating={calculating} onSelect={showRouteOnMap} onShowMap={() => showRouteOnMap()} /></div>
