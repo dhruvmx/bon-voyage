@@ -1721,6 +1721,11 @@ function Profile({ user, setUser, notify, onLogout }) {
         </form>
         <hr />
         <h2>Account security</h2>
+        <p>{user.mfa_enabled ? "Authenticator 2FA is enabled. Google sign-in and an authenticator code are required." : "Add authenticator-app verification to your Google sign-in."}</p>
+        {!user.mfa_enabled && <Suspense fallback={<p>Loading authenticator setup…</p>}>
+          <GoogleSignIn enrollFor={user} busy={busy} setBusy={setBusy} onSuccess={(account) => { setUser(account); notify("Authenticator 2FA enabled. Other sessions have been signed out."); }} />
+        </Suspense>}
+        {user.mfa_enabled && <p className="fine-print">Keep access to your authenticator. If it is lost, contact the project administrator for recovery.</p>}
         {user.has_password === false ? <p>You sign in with Google. Manage your password in your Google Account.</p> : <>
         <p>Update your password. Other sessions will be signed out.</p>
         <button

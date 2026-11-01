@@ -121,6 +121,37 @@ class FirebaseAuthTests(unittest.TestCase):
             result = self.client.post('/api/auth/google', json={'id_token': sign()})
             self.assertEqual(result.status_code, 200, result.text)
 
+    def test_totp_enrollment_requires_verified_second_factor_and_revokes_old_sessions(self):
+        user = self.exchange().json()
+        old_session = TestClient(main.app); self.addCleanup(old_session.close)
+        old_session.cookies.update(self.client.cookies)
+        self.assertEqual(self.client.post('/api/auth/google/mfa/check', json={'id_token':'test-token-for-firebase-verification'}).status_code, 200)
+        incomplete = self.client.post('/api/auth/google/mfa/enable', json={'id_token':'test-token-for-firebase-verification'})
+        self.assertEqual(incomplete.status_code, 409)
+        self.assertFalse(self.client.get('/api/auth/me').json()['mfa_enabled'])
+        self.verifier.return_value = claims(firebase={'sign_in_provider':'google.com','sign_in_second_factor':'totp'})
+        enabled = self.client.post('/api/auth/google/mfa/enable', json={'id_token':'test-token-for-firebase-verification'})
+        self.assertEqual(enabled.status_code, 200, enabled.text)
+        self.assertTrue(enabled.json()['mfa_enabled'])
+        self.assertEqual(old_session.get('/api/auth/me').status_code, 401)
+        self.assertEqual(self.client.get('/api/auth/me').json()['id'], user['id'])
+        self.client.post('/api/auth/logout')
+        self.verifier.return_value = claims()
+        self.assertEqual(self.exchange().status_code, 401)
+        self.verifier.return_value = claims(firebase={'sign_in_provider':'google.com','sign_in_second_factor':'totp'})
+        self.assertTrue(self.exchange().json()['mfa_enabled'])
+
+    def test_totp_cannot_be_bypassed_by_password_or_enabled_for_another_identity(self):
+        self.client.post('/api/auth/signup', json={'email':'operator@example.com','name':'Operator','password':'existing-password'})
+        self.assertEqual(self.client.post('/api/auth/google/mfa/check',json={'id_token':'test-token-for-firebase-verification'}).status_code,200)
+        self.verifier.return_value = claims(sub='someone-else',email='other@example.com',firebase={'sign_in_provider':'google.com','sign_in_second_factor':'totp'})
+        self.assertEqual(self.client.post('/api/auth/google/mfa/enable',json={'id_token':'test-token-for-firebase-verification'}).status_code,403)
+        self.verifier.return_value = claims(firebase={'sign_in_provider':'google.com','sign_in_second_factor':'totp'})
+        self.assertEqual(self.client.post('/api/auth/google/mfa/enable',json={'id_token':'test-token-for-firebase-verification'}).status_code,200)
+        self.client.post('/api/auth/logout')
+        self.assertEqual(self.client.post('/api/auth/login',json={'email':'operator@example.com','password':'existing-password'}).status_code,403)
+        self.assertEqual(self.client.get('/api/auth/me').status_code,401)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -48,6 +48,8 @@ test('Google exchange renews sessions while invalid Google credentials do not ex
   globalThis.fetch = async () => response(200);
   await api('/auth/google', {method:'POST'});
   assert.equal(getSessionVersion(), before + 1);
+  await api('/auth/google/mfa/enable', {method:'POST'});
+  assert.equal(getSessionVersion(), before + 2);
 });
 
 test('HTML and empty successful responses report an error instead of entering app state', async () => {

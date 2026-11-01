@@ -12,3 +12,11 @@ If Firebase configuration is missing, email/password login remains available and
 
 Authentication checks: `python -m unittest backend.test_firebase_auth -v`. Tests use isolated databases and disposable signing keys; they never create live Google accounts.
 
+## Authenticator-app 2FA
+
+Upgrade Firebase Authentication to Identity Platform (Spark remains free, with a 3,000 daily-active-user limit) and enable TOTP in the project's MFA provider configuration. SMS is not needed. In Profile → Account security, select **Enable authenticator 2FA**, confirm the same Google account, add the displayed setup key as a time-based account in an authenticator app, and verify its six-digit code. If Firebase requires a fresh MFA sign-in after enrollment, select **Finish enabling 2FA** and complete Google sign-in and the code prompt once more.
+
+Firebase generates and verifies all authenticator secrets/codes. Python stores only an enforcement flag and checks Firebase's signed `sign_in_second_factor: totp` claim before issuing a protected account's session. Enabling 2FA revokes older Bon Voyage sessions. Local password sign-in cannot bypass an enabled factor. A Firebase enrollment alone is not reported as fully enabled in Bon Voyage until a signed MFA token has been verified. No authenticator secret or code is stored in Bon Voyage's database.
+
+After enrollment, Google sign-in prompts for the authenticator code. Keep the authenticator accessible: recovery requires the Firebase project administrator to verify the account owner, remove the lost Firebase factor, clear the account's `user_security.totp_required` flag and revoke all application sessions. There is no automatic email/password fallback or self-service disable flow.
+

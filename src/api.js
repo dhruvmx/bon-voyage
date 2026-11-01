@@ -3,7 +3,7 @@ import { saveVoyagePdf } from './voyagePdf.js';
 // Version requests by authentication lifecycle, including renewal for the same user.
 let sessionVersion = 0;
 export const getSessionVersion = () => sessionVersion;
-const sessionActions = new Set(["/auth/login", "/auth/signup", "/auth/google", "/auth/logout", "/auth/password"]);
+const sessionActions = new Set(["/auth/login", "/auth/signup", "/auth/google", "/auth/google/mfa/enable", "/auth/logout", "/auth/password"]);
 
 export async function api(path, options = {}) {
   const requestSession = sessionVersion;
@@ -38,7 +38,7 @@ export async function api(path, options = {}) {
     }
     if (!response.ok) {
       const staleSession = requestSession !== sessionVersion;
-      if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/google", "/auth/me"].includes(path)) {
+      if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/google", "/auth/google/mfa/check", "/auth/google/mfa/enable", "/auth/me"].includes(path)) {
         ++sessionVersion;
         window.dispatchEvent(new Event("bon-voyage-session-expired"));
       }

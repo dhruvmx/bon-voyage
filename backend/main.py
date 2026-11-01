@@ -44,6 +44,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS voyages(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS login_attempts(key TEXT NOT NULL,at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS auth_identities(provider TEXT NOT NULL,subject TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(provider,subject));
+        CREATE TABLE IF NOT EXISTS user_security(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,totp_required INTEGER NOT NULL DEFAULT 0);
         CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires);
         CREATE INDEX IF NOT EXISTS attempts_key_idx ON login_attempts(key,at);
         CREATE INDEX IF NOT EXISTS vessels_user_idx ON vessels(user_id);
@@ -68,7 +69,19 @@ async def security(request,call_next):
 
 def hash_password(password,salt):
     return hashlib.pbkdf2_hmac('sha256',password.encode(),bytes.fromhex(salt),310000).hex()
-def public_user(row): return {**{k:row[k] for k in ('id','email','name','company','role')},'has_password':bool(row['password_hash'])}
+def requires_totp(user_id):
+    with db() as c:
+        row=c.execute('SELECT totp_required FROM user_security WHERE user_id=?',(user_id,)).fetchone()
+    return bool(row and row['totp_required'])
+
+def public_user(row):
+    return {**{k:row[k] for k in ('id','email','name','company','role')},'has_password':bool(row['password_hash']),'mfa_enabled':requires_totp(row['id'])}
+
+def has_totp_proof(claims):
+    return claims.get('firebase',{}).get('sign_in_second_factor')=='totp'
+
+def mark_totp(c,user_id):
+    c.execute('INSERT INTO user_security(user_id,totp_required) VALUES(?,1) ON CONFLICT(user_id) DO UPDATE SET totp_required=1',(user_id,))
 def current_user(request:Request):
     token=request.cookies.get('tideway_session',''); digest=hashlib.sha256(token.encode()).hexdigest()
     with db() as c: row=c.execute('SELECT u.* FROM users u JOIN sessions s ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?',(digest,time.time())).fetchone()
@@ -142,12 +155,46 @@ def google_login(p:GoogleCredentials,request:Request,response:Response):
                     c.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?,?)',(uid,claims['email'],name,'','Fleet operator',secrets.token_hex(16),'',time.time()))
                     row=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
                 c.execute('INSERT INTO auth_identities VALUES(?,?,?)',('firebase_google',claims['identity'],row['id']))
-            user=public_user(row)
+            security=c.execute('SELECT totp_required FROM user_security WHERE user_id=?',(row['id'],)).fetchone()
+            if security and security['totp_required'] and not has_totp_proof(claims):
+                raise HTTPException(401,'Complete authenticator verification to sign in.')
+            if has_totp_proof(claims):
+                mark_totp(c,row['id'])
+                if not security or not security['totp_required']:
+                    c.execute('DELETE FROM sessions WHERE user_id=?',(row['id'],))
             c.execute('DELETE FROM login_attempts WHERE key=?',(key,))
     except INTEGRITY_ERRORS as error:
         raise HTTPException(409,'Another sign-in completed at the same time. Please try Google sign-in again.') from error
+    user=public_user(row)
     session(response,user['id'])
     return user
+
+def verify_own_google_identity(token,user):
+    claims=verify_google_token(token)
+    with db() as c:
+        identity=c.execute('SELECT user_id FROM auth_identities WHERE provider=? AND subject=?',('firebase_google',claims['identity'])).fetchone()
+        if not identity and claims['email']==user['email']:
+            c.execute('INSERT INTO auth_identities VALUES(?,?,?) ON CONFLICT(provider,subject) DO NOTHING',('firebase_google',claims['identity'],user['id']))
+            identity=c.execute('SELECT user_id FROM auth_identities WHERE provider=? AND subject=?',('firebase_google',claims['identity'])).fetchone()
+        if not identity or identity['user_id']!=user['id']:
+            raise HTTPException(403,'Choose the Google account connected to this workspace.')
+    return claims
+
+@app.post('/api/auth/google/mfa/check')
+def google_mfa_check(p:GoogleCredentials,user=Depends(current_user)):
+    verify_own_google_identity(p.id_token,user)
+    return {'ok':True}
+
+@app.post('/api/auth/google/mfa/enable')
+def google_mfa_enable(p:GoogleCredentials,response:Response,user=Depends(current_user)):
+    claims=verify_own_google_identity(p.id_token,user)
+    if not has_totp_proof(claims):
+        raise HTTPException(409,{'code':'mfa_verification_required','message':'Sign in with Google again and enter your authenticator code to finish enabling 2FA.'})
+    with db() as c:
+        mark_totp(c,user['id'])
+        c.execute('DELETE FROM sessions WHERE user_id=?',(user['id'],))
+    session(response,user['id'])
+    return {**user,'mfa_enabled':True}
 
 @app.get('/api/health')
 def health():
@@ -174,6 +221,7 @@ def login(p:Credentials,request:Request,response:Response):
     if not row or not hmac.compare_digest(actual,row['password_hash']):
         with db() as c: c.execute('INSERT INTO login_attempts VALUES(?,?)',(key,time.time()))
         raise HTTPException(401,'Email or password is incorrect.')
+    if requires_totp(row['id']): raise HTTPException(403,'This account uses 2FA. Continue with Google and your authenticator code.')
     with db() as c: c.execute('DELETE FROM login_attempts WHERE key=?',(key,))
     session(response,row['id']); return public_user(row)
 @app.post('/api/auth/logout')
