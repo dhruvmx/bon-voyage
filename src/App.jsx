@@ -171,7 +171,7 @@ export default function App() {
     [notes, setNotes] = useState(""),
     [voyageStatus, setVoyageStatus] = useState("Planned");
   const [saving, setSaving] = useState(false);
-  const draftVersion = useRef(0), saveOperation = useRef(0);
+  const draftVersion = useRef(0), saveOperation = useRef(0), vesselSelection = useRef(0);
   const invalidateDraftRequests = useCallback(() => {
     ++draftVersion.current; ++saveOperation.current; setSaving(false);
   }, []);
@@ -424,6 +424,7 @@ export default function App() {
     setQuery("");
   };
   const useVessel = (id) => {
+    ++vesselSelection.current;
     setVesselId(id);
     const v = vessels.find((x) => x.id === id);
     if (v)
@@ -558,15 +559,15 @@ export default function App() {
   async function searchAction(item) {
     if (item.kind === "voyage") { loadVoyage(item.item); return; }
     if (item.kind === "vessel") {
-      const owner = account.current, session = getSessionVersion(), draft = draftVersion.current;
+      const owner = account.current, session = getSessionVersion(), draft = draftVersion.current, selection = ++vesselSelection.current;
       try {
         const ship = await api(`/vessels/${item.item.id}`);
-        if (owner !== account.current || session !== getSessionVersion() || draft !== draftVersion.current) return;
+        if (owner !== account.current || session !== getSessionVersion() || draft !== draftVersion.current || selection !== vesselSelection.current) return;
         setVessels((previous) => [...previous.filter((v) => v.id !== ship.id), ship]);
         setVesselId(ship.id);
         setInputs((previous) => ({ ...previous, max_speed: ship.max_speed, min_speed: ship.min_speed, fuel_per_day: ship.fuel_per_day }));
         revealPlanner("details.advanced"); notify(`${ship.name} assigned to this passage.`);
-      } catch (e) { if (owner === account.current && session === getSessionVersion()) setDataError(e.message); }
+      } catch (e) { if (owner === account.current && session === getSessionVersion() && selection === vesselSelection.current) setDataError(e.message); }
       return;
     }
     if (item.kind === "port") {
