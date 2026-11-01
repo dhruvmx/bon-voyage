@@ -79,11 +79,14 @@ const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimat
     await errorArrived.promise;
     await page.getByRole('button', { name: 'Open profile', exact: true }).click();
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('.profile-button strong')?.textContent === 'John Doe');
+    assert.equal(await page.locator('.profile-button strong').textContent(), 'John Doe');
     await page.getByRole('button', { name: 'Log in', exact: true }).click();
     await page.getByLabel('Email address', { exact: true }).fill(email);
     await page.getByLabel('Password', { exact: true }).fill(password);
     await page.locator('dialog form').getByRole('button', { name: 'Log in', exact: true }).click();
     await page.getByRole('button', { name: 'Open profile', exact: true }).waitFor();
+    assert.equal(await page.locator('.profile-button strong').textContent(), 'Regression Operator');
     const oldError = page.waitForResponse((r) => r.status() === 401 && r.url().includes('/api/voyages?'));
     releaseError.resolve();
     await oldError;
