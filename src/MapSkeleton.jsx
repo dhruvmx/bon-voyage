@@ -17,6 +17,7 @@ export default function RouteMapSkeleton({ color }) {
           <div className="map-skeleton-content">
             <span className="map-dynamic-spinner large" aria-hidden="true" />
             <strong>Loading route map…</strong>
+            <small>Preparing interactive maritime navigation</small>
           </div>
         </div>
         <span className="map-badge" role="status">

@@ -100,20 +100,15 @@ class BonVoyageTests(unittest.TestCase):
         self.assertEqual(catalog['max_cargo_items'],10)
         self.assertEqual(catalog['max_arrival_hours'],2160)
         self.assertFalse(catalog['data_coverage']['whale']['live'])
-        zones=catalog['zones']
-        self.assertTrue(any(zone.get('rings') for zone in zones)); self.assertTrue(any(zone.get('radius_nm') for zone in zones))
-        self.assertEqual(catalog['data_coverage']['whale']['zone_count'],len(zones))
 
     def test_international_route_and_long_arrival_window(self):
         response=self.a.post('/api/plan',json={**self.inputs,'origin':'shanghai','destination':'singapore','arrival_window':2160})
         self.assertEqual(response.status_code,200,response.text)
         result=response.json()
-        self.assertTrue(result['data_coverage']['whale']['score_available'])
-        self.assertEqual(result['data_coverage']['whale']['status'],'mapped-zones')
+        self.assertFalse(result['data_coverage']['whale']['score_available'])
         self.assertEqual(len(result['routes']),3)
         for route in result['routes']:
-            # Worldwide passages are scored against the bundled mapped zones.
-            self.assertTrue(route['whale_assessed']); self.assertGreaterEqual(route['protection'],0); self.assertLessEqual(route['protection'],100)
+            self.assertIsNone(route['protection']); self.assertFalse(route['whale_assessed'])
             self.assertTrue(route['feasible']); self.assertGreater(route['hours'],0)
             self.assertEqual(route['coordinates'][0],[31.35,121.6])
             self.assertAlmostEqual(route['coordinates'][-1][0],1.26,places=3)
@@ -235,8 +230,8 @@ class BonVoyageTests(unittest.TestCase):
         payload.update(origin='shanghai',destination='singapore')
         global_route=self.a.post('/api/plan',json=payload).json()['routes'][0]
         weights=global_route['score_breakdown']['weights']
-        self.assertGreater(weights['habitat'],0); self.assertAlmostEqual(sum(weights.values()),1)
-        self.assertIsNotNone(global_route['score_breakdown']['components']['habitat'])
+        self.assertEqual(weights['habitat'],0); self.assertAlmostEqual(sum(weights.values()),1)
+        self.assertIsNone(global_route['score_breakdown']['components']['habitat'])
 
     def test_frozen_thawing_cold_floor_and_priority_override(self):
         from backend.cargo_model import evaluate_cargo

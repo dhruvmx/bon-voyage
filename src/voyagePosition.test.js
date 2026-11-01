@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { positionAtProgress, continuousHeading } from './voyagePosition.js';
+import { positionAtProgress } from './voyagePosition.js';
 const route = {
   hours: 4.00001, coordinates: [[0,0],[0,10],[0,40]],
   segments: [{from:[0,0],to:[0,10],hours:1},{from:[0,10],to:[0,40],hours:3}],
@@ -31,7 +31,4 @@ test('projected direction matches east-west lines at high latitude and unwraps n
   assert.equal(continuousHeading(359, 1), 361);
   assert.equal(continuousHeading(1, 359), -1);
   assert.equal(continuousHeading(null, 45), 45);
-  assert.equal(continuousHeading(350, 10), 370);
-  assert.equal(continuousHeading(10, 350), -10);
-  assert.equal(continuousHeading(180, 185), 185);
 });

@@ -40,9 +40,11 @@ export function manifestError(items) {
   return "";
 }
 
-export function whaleAssessed(route, _inputs) {
-  if (route?.whale_assessed !== undefined) return route.whale_assessed;
-  return route?.protection != null;
+const californiaPorts = new Set(["la", "oakland", "sandiego", "humboldt"]);
+export function whaleAssessed(route, inputs) {
+  if (route?.protection == null) return false;
+  if (route.whale_assessed !== undefined) return route.whale_assessed;
+  return californiaPorts.has(inputs.origin) && californiaPorts.has(inputs.destination);
 }
 
 export function formatHours(hours) {

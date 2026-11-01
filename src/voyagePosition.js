@@ -39,4 +39,3 @@ export function continuousHeading(previous, heading) {
   if (!Number.isFinite(previous)) return heading;
   return previous + ((heading - previous + 180) % 360 + 360) % 360 - 180;
 }
-

@@ -4,43 +4,11 @@ import { positionAtProgress, headingAtProgress, continuousHeading } from "./voya
 import "leaflet/dist/leaflet.css";
 import { Layers, LocateFixed, Pause, Play, RefreshCw } from "lucide-react";
 
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// "Nov–Apr" for a contiguous (possibly year-wrapping) run of months, else a comma list.
-function seasonLabel(months) {
-  if (!months?.length || months.length === 12) return "";
-  const set = new Set(months);
-  const start = months.find((m) => !set.has(m === 1 ? 12 : m - 1));
-  if (start === undefined) return "";
-  let end = start;
-  while (set.has(end === 12 ? 1 : end + 1) && end !== start - 1) end = end === 12 ? 1 : end + 1;
-  if (months.length === 1) return MONTH_NAMES[start - 1];
-  const contiguous = ((end - start + 12) % 12) + 1 === months.length;
-  return contiguous
-    ? `${MONTH_NAMES[start - 1]}–${MONTH_NAMES[end - 1]}`
-    : months.map((m) => MONTH_NAMES[m - 1]).join(", ");
-}
-
-// Plain-text tooltip node: zone names may come from imported data files, so never inject them as HTML.
-function zoneTooltip(zone, inactive) {
-  const season = seasonLabel(zone.months);
-  const parts = [
-    zone.name,
-    zone.kind === "vsr" ? "10 kn maximum" : "Whale habitat / ≤10 kn",
-    season && `Seasonal ${season}${inactive ? " · not active at departure" : ""}`,
-    zone.approximate && "Approximate outline",
-  ].filter(Boolean);
-  const node = document.createElement("span");
-  node.textContent = parts.join(" · ");
-  return node;
-}
-
 export default function VoyageMap({
   route,
   highlightToken = 0,
   routes,
   zones,
-  activeZoneIds = null,
   color,
   coverage,
   progress,
@@ -291,28 +259,24 @@ export default function VoyageMap({
       renderedRouteOffsets.add(offset);
 
       // Protection / habitat zones
-      // Polygon zones carry `rings` ([outer, ...holes] of [lat, lon]); the legacy
-      // California scenario zones are circles. Zones outside their season are drawn faint.
       zones
         .filter((z) => layers[z.kind === "vsr" ? "vsr" : "habitat"])
-        .forEach((z) => {
-          const inactive = Array.isArray(activeZoneIds) && !activeZoneIds.includes(z.id);
-          const colour = z.kind === "vsr" ? "var(--protected)" : "var(--habitat)";
-          const style = {
-            color: colour,
-            fillColor: colour,
-            fillOpacity: inactive ? 0.05 : 0.22,
-            dashArray: inactive ? "2 8" : "6 5",
-            weight: inactive ? 1 : 2,
-          };
-          const shape = z.rings
-            ? L.polygon(
-                z.rings.map((ring) => ring.map(([lat, lon]) => [lat, lon + offset])),
-                style
-              )
-            : L.circle([z.lat, z.lon + offset], { ...style, radius: z.radius_nm * 1852 });
-          shape.bindTooltip(zoneTooltip(z, inactive)).addTo(group);
-        });
+        .forEach((z) =>
+          L.circle([z.lat, z.lon + offset], {
+            radius: z.radius_nm * 1852,
+            color: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
+            fillColor: z.kind === "vsr" ? "var(--protected)" : "var(--habitat)",
+            fillOpacity: 0.22,
+            dashArray: "6 5",
+            weight: 2,
+          })
+            .bindTooltip(
+              `${z.name}${
+                z.kind === "vsr" ? " · 10 kn maximum" : " · Whale habitat / ≤10 kn"
+              }`
+            )
+            .addTo(group)
+        );
 
       // Alternative routes
       if (layers.alternatives)
@@ -460,7 +424,7 @@ export default function VoyageMap({
       instance.off("move", ensureRouteOverlays);
       instance.off("moveend", ensureRouteOverlays);
     };
-  }, [route, routes, zones, activeZoneIds, color, layers]);
+  }, [route, routes, zones, color, layers]);
 
   useEffect(() => {
     if (!highlightToken || !route || !map.current) return;
@@ -518,8 +482,8 @@ export default function VoyageMap({
         {showLayers && (
           <div className="layer-menu">
             {[
-              ["habitat", "Whale habitats (mapped zones)"],
-              ["vsr", "Modeled slow zones"],
+              ["habitat", "Whale habitats (California scenario)"],
+              ["vsr", "Modeled slow zones (California)"],
               ["alternatives", "Alternative routes"],
             ].map(([id, label]) => (
               <label key={id}>
@@ -584,7 +548,7 @@ export default function VoyageMap({
         </a>
       </div>
       {coverage?.whale && <details className="coverage-note">
-        <summary><strong>{coverage.whale.score_available ? (coverage.whale.status === "scenario" ? "California scenario coverage" : "Mapped whale zone coverage") : "Whale habitat coverage incomplete"}</strong><span>Data details</span></summary>
+        <summary><strong>{coverage.whale.score_available ? "California scenario coverage" : "Whale habitat coverage incomplete"}</strong><span>Data details</span></summary>
         <p>{coverage.whale.summary} {coverage.whale.note}</p>
         <a href={coverage.whale.global_reference} target="_blank" rel="noreferrer">About worldwide habitat coverage ↗</a>
       </details>}
