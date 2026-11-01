@@ -101,6 +101,7 @@ const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimat
     console.log('PASS: current-session expiry still prompts login.');
 
     // Fastest route has a rounded duration above the sum of its segment times.
+    await page.locator(".compare-disclosure > summary").click();
     const fastest = page.locator('.route-card').filter({ has: page.getByRole('heading', { name: 'Fastest feasible arrival', exact: true }) });
     await fastest.click();
     const slider = page.getByRole('slider', { name: 'Voyage progress', exact: true });

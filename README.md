@@ -35,7 +35,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 1. Explore the dashboard as a guest. Switch cargo categories, ports, arrival windows, temperatures, and map layers.
 2. Click **Sign up** and create your own account. No seeded credentials are needed.
 3. Open **My fleet**, add a vessel, and enter minimum open-water speed, maximum speed, consumption at 18 knots, and cargo capacity.
-4. Return to the planner, expand **Vessel, cargo & departure details**, and assign the vessel.
+4. Return to the planner, expand **Vessel & departure**, and assign the vessel.
 5. Search the 255-product cargo catalogue or add custom cargo. Add up to 10 distinct items, then expand each item to edit its weight, age, shelf life, and temperature. Set departure time and an arrival window of up to 90 days.
 6. Set the latest acceptable arrival, then compare the recommended balance, fastest feasible arrival, and lowest fuel within the deadline. Play or scrub the voyage on the map.
 7. Save your passage with a name, notes, and operational status.
@@ -53,7 +53,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Each of the 255 products has numeric perishability metadata. Individual food/flower horizons, temperature response, frozen/thawed quality caps, and remaining life drive automatic freshness/fuel/habitat priorities. Durable goods have zero modeled spoilage. Expand an item to inspect its model or override routing preference; selected-route priorities and score breakdowns explain the recommendation. See `backend/DATA.md` for equations and assumptions.
 - Arrival windows range from 1 to 2,160 hours (90 days), with a slider and precise numeric entry.
 - Protected segment speeds at or below 10 knots, vessel maximum-speed limits, arrival feasibility, temperature-dependent freshness, shelf-life decay, cubic fuel calculation, CO₂ estimates, and whale exposure scores.
-- Route comparison sits immediately beneath the map, beside the planning form on desktop. Cards show sailing time, fuel burned, lowest cargo quality, and deadline slack, with fuel differences explicitly compared to the recommendation. Selecting an option scrolls to its map and briefly emphasizes its path; reduced-motion preferences receive static emphasis.
+- The planner opens with a compact selected-passage summary, map and port inputs. Cargo editing, arrival allowance, route comparison and the detailed voyage report expand on demand; no planning features are removed. On mobile, the setup form appears before the map. Route comparison sits in an expandable section immediately beneath the map, beside the planning form on desktop. Cards show sailing time, fuel burned, lowest cargo quality, and deadline slack, with fuel differences explicitly compared to the recommendation. Selecting an option scrolls to its map and briefly emphasizes its path; reduced-motion preferences receive static emphasis.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
 - Responsive layout with mobile navigation.
@@ -74,7 +74,7 @@ Tests cover authentication, password changes, duplicate accounts, password hashi
 
 Additional checks cover international and Pacific dateline passages, readable missing-dependency/no-route errors, 90-day arrival windows, catalogue size and uniqueness, manifest limits and custom cargo, item-level freshness, canonical product identity, combined-weight capacity checks, and manifest persistence.
 
-Browser regressions cover delayed saves, renewed sessions, genuine expiry, and playback endpoints. Install Chromium once with `npx playwright install chromium`, then start an isolated local server in one terminal:
+Browser regressions cover delayed saves, renewed sessions, genuine expiry, and playback endpoints. `npm run test:planner` also checks the compact homepage and access to cargo/custom cargo, deadlines, vessel settings, comparison, live metrics, export, map coverage, and mobile layouts. Install Chromium once with `npx playwright install chromium`, then start an isolated local server in one terminal:
 
 ```sh
 BON_VOYAGE_DB=/tmp/bon-voyage-browser.sqlite3 python -m uvicorn backend.main:app --port 8001

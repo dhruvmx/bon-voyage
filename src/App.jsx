@@ -630,12 +630,12 @@ export default function App() {
             )}
           </div>
         </header>
-        <div className="page">
+        <div className={`page ${view === "planner" ? "planner-page" : ""}`}>
           <div className="page-title">
             <div>
               <h1>
                 {view === "planner"
-                  ? "A better way across."
+                  ? "Plan your passage."
                   : view === "voyages"
                     ? "Your voyages. Your course."
                     : view === "fleet"
@@ -646,7 +646,7 @@ export default function App() {
               </h1>
               <p>
                 {view === "planner"
-                  ? "Fresh cargo. Safer oceans. Smarter voyages."
+                  ? "Choose your ports. Find your best way across."
                   : view === "profile"
                     ? "Your identity, preferences, and account."
                     : "Your maritime workspace, connected from port to port."}
@@ -654,13 +654,14 @@ export default function App() {
             </div>
             {view === "planner" ? (
               <button
-                className="button secondary"
+                className="button secondary planner-export"
+                aria-label="Export voyage" title="Export voyage"
                 disabled={!ready}
                 onClick={() =>
                   download({ inputs, route, data_mode: result.data_mode, data_coverage: result.data_coverage, optimization: result.optimization, deadline_at: result.deadline_at })
                 }
               >
-                <Download size={15} /> Export voyage
+                <Download size={15} /><span className="export-label">Export voyage</span>
               </button>
             ) : (
               view !== "profile" && (
@@ -701,64 +702,18 @@ export default function App() {
             </div>
           ) : view === "planner" ? (
             <>
-              {route && result.deadline_at && <section className="panel deadline-summary" aria-label="Deadline and arrival estimate">
-                <div><small>Latest acceptable arrival</small><strong>{date(result.deadline_at)}</strong></div>
-                <div><small>Estimated arrival · selected passage</small><strong>{date(route.eta)}</strong></div>
-                <div><small>{route.feasible ? "Time before deadline" : "Time past deadline"}</small><strong>{formatDuration(Math.abs(route.slack_hours))}</strong></div>
-                <p role="status">{calculating ? "Updating path and speed estimates…" : result.status === "infeasible" ? "Deadline infeasible at the allowed speeds. Showing the earliest available estimate." : result.optimization?.deadline_binding ? "The deadline requires a faster cruise than the unconstrained recommendation. Earlier arrival is still allowed." : "The recommended path and speed are chosen for cargo and operating costs. No waiting is added to fill the allowance."}</p>
-              </section>}
-              <section className="stats">
-                <Stat
-                  label={manifest.length > 1 ? "Cargo freshness now (avg.)" : "Cargo freshness now"}
-                  value={journey ? journey.freshness.toFixed(1) : "—"}
-                  unit="%"
-                  sub={route ? `${Number(inputs.weight).toLocaleString()} tonnes · ${manifest.length} cargo item${manifest.length === 1 ? "" : "s"} · ${route.freshness.toFixed(1)}% forecast on arrival` : "Calculate a passage to see cargo quality"}
-                  icon={Leaf}
-                />
-                <Stat
-                  label="Time to destination"
-                  value={journey ? journey.remainingHours.toFixed(1) : "—"}
-                  unit="hrs"
-                  sub={journey ? `${journey.elapsedHours.toFixed(1)} h simulated · ETA ${date(route.eta)}` : "Calculate a passage to see ETA"}
-                  icon={Clock}
-                />
-                <Stat
-                  label="Fuel consumed"
-                  value={journey ? journey.fuelConsumed.toFixed(2) : "—"}
-                  unit="t"
-                  sub={route && journey ? `${route.fuel.toFixed(1)} t planned · ${journey.co2Consumed.toFixed(2)} t CO₂ used` : "Speed-adjusted consumption"}
-                  icon={BarChart3}
-                />
-                <Stat
-                  label="Whale assessment"
-                  value={whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"}
-                  unit={whaleAssessed(route, inputs) ? "/100" : ""}
-                  sub={route && journey
-                    ? `${journey.activeSegment?.zone || "Open-water leg"} · ${journey.activeSpeed.toFixed(1)} kn${whaleAssessed(route, inputs) ? ` · route score ${Math.round(route.protection)}/100` : ""}`
-                    : whaleAssessed(route, inputs) ? "California scenario estimate" : "Habitat coverage incomplete"}
-                  dark
-                  icon={ShieldCheck}
-                />
-              </section>
-              <div className="planner-grid">
-                <div className="passage-preview" ref={preview}>
-                  <VoyageMap
-                    highlightToken={routeHighlight}
-                    route={route}
-                    routes={result?.routes || []}
-                    zones={catalog.zones}
-                    color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"}
-                    coverage={result?.data_coverage}
-                    progress={progress}
-                    setProgress={setProgress}
-                    playing={playing}
-                    setPlaying={setPlaying}
-                  />
-                  <RouteComparison result={result} selected={selected} calculating={calculating} onSelect={showRouteOnMap} onShowMap={() => showRouteOnMap()} />
+              {route && <section className="route-overview" aria-label="Selected passage summary" aria-busy={calculating}>
+                <div><small>{calculating ? "Updating passage…" : "Selected passage"}</small><strong>{route.name}</strong></div>
+                <div className="route-overview-values">
+                  <span><small>Sailing time</small><strong>{formatDuration(route.hours)}</strong></span>
+                  <span><small>Fuel estimate</small><strong>{route.fuel.toFixed(1)} t</strong></span>
+                  <span><small>Arrival</small><strong>{date(route.eta)}</strong></span>
                 </div>
+              </section>}
+              <div className="planner-grid">
                 <section className="panel config">
                   <div className="panel-heading">
-                    <h2>Plan your passage</h2>
+                    <h2>Passage setup</h2>
                   </div>
                   <div className="config-body">
                     <div className="port-pickers">
@@ -818,8 +773,16 @@ export default function App() {
                         </select>
                       </Field>
                     </div>
+                    <details className="planner-disclosure cargo-editor">
+                      <summary><span><strong>Cargo manifest</strong><small>{manifest.length === 1 ? manifest[0].name : `${manifest.length} items`} · {Number(inputs.weight).toLocaleString()} t</small></span><Plus size={16} aria-hidden="true" /></summary>
+                      <div className="disclosure-content">
                     <CargoPicker products={catalog.cargo_products || []} profiles={catalog.cargo_types}
                       items={manifest} onChange={setManifest} results={route?.cargo_results} calculating={calculating} />
+                      </div>
+                    </details>
+                    <details className="planner-disclosure deadline-editor">
+                      <summary><span><strong>Arrival allowance</strong><small>Up to {formatHours(inputs.arrival_window)} after departure</small></span><Plus size={16} aria-hidden="true" /></summary>
+                      <div className="disclosure-content">
                     <label className="range-label" htmlFor="arrival-window">
                       Latest acceptable arrival{" "}
                       <strong>{formatHours(inputs.arrival_window)}</strong>
@@ -838,9 +801,11 @@ export default function App() {
                     <small className="cargo-hint">A maximum time allowance. Earlier arrival is allowed; the planner chooses the path and speed.</small>
                     <Field label="Deadline from departure (hours)" type="number" min="1" max="2160" step="1"
                       value={inputs.arrival_window} onChange={(event) => change("arrival_window", Number(event.target.value))} />
+                      </div>
+                    </details>
                     <details className="advanced">
                       <summary>
-                        Vessel, cargo & departure details <Plus size={13} />
+                        Vessel & departure <Plus size={13} />
                       </summary>
                       <div className="advanced-fields">
                         <Field label="Assigned vessel">
@@ -971,7 +936,67 @@ export default function App() {
                     </button>
                   </div>
                 </section>
+                <div className="passage-preview" ref={preview}>
+                  <VoyageMap
+                    highlightToken={routeHighlight}
+                    route={route}
+                    routes={result?.routes || []}
+                    zones={catalog.zones}
+                    color={manifest.length > 1 ? "var(--accent)" : cargo?.color || "var(--accent)"}
+                    coverage={result?.data_coverage}
+                    progress={progress}
+                    setProgress={setProgress}
+                    playing={playing}
+                    setPlaying={setPlaying}
+                  />
+                  <details className="panel planner-disclosure compare-disclosure">
+                    <summary><span><strong>Compare routes</strong><small>{result?.status === "infeasible" ? "Earliest available estimate" : `${result?.routes.length || 0} options · choose a different passage`}</small></span><Plus size={16} aria-hidden="true" /></summary>
+                    <div className="disclosure-content"><RouteComparison result={result} selected={selected} calculating={calculating} onSelect={showRouteOnMap} onShowMap={() => showRouteOnMap()} /></div>
+                  </details>
+                </div>
               </div>
+              <details className="panel planner-report">
+                <summary><span><strong>Voyage details</strong><small>Playback metrics, cargo quality and timings</small></span><Plus size={16} aria-hidden="true" /></summary>
+                <div className="planner-report-body">
+              {route && result.deadline_at && <section className="panel deadline-summary" aria-label="Deadline and arrival estimate">
+                <div><small>Latest acceptable arrival</small><strong>{date(result.deadline_at)}</strong></div>
+                <div><small>Estimated arrival · selected passage</small><strong>{date(route.eta)}</strong></div>
+                <div><small>{route.feasible ? "Time before deadline" : "Time past deadline"}</small><strong>{formatDuration(Math.abs(route.slack_hours))}</strong></div>
+                <p role="status">{calculating ? "Updating path and speed estimates…" : result.status === "infeasible" ? "Deadline infeasible at the allowed speeds. Showing the earliest available estimate." : result.optimization?.deadline_binding ? "The deadline requires a faster cruise than the unconstrained recommendation. Earlier arrival is still allowed." : "The recommended path and speed are chosen for cargo and operating costs. No waiting is added to fill the allowance."}</p>
+              </section>}
+              <section className="stats">
+                <Stat
+                  label={manifest.length > 1 ? "Cargo freshness now (avg.)" : "Cargo freshness now"}
+                  value={journey ? journey.freshness.toFixed(1) : "—"}
+                  unit="%"
+                  sub={route ? `${Number(inputs.weight).toLocaleString()} tonnes · ${manifest.length} cargo item${manifest.length === 1 ? "" : "s"} · ${route.freshness.toFixed(1)}% forecast on arrival` : "Calculate a passage to see cargo quality"}
+                  icon={Leaf}
+                />
+                <Stat
+                  label="Time to destination"
+                  value={journey ? journey.remainingHours.toFixed(1) : "—"}
+                  unit="hrs"
+                  sub={journey ? `${journey.elapsedHours.toFixed(1)} h simulated · ETA ${date(route.eta)}` : "Calculate a passage to see ETA"}
+                  icon={Clock}
+                />
+                <Stat
+                  label="Fuel consumed"
+                  value={journey ? journey.fuelConsumed.toFixed(2) : "—"}
+                  unit="t"
+                  sub={route && journey ? `${route.fuel.toFixed(1)} t planned · ${journey.co2Consumed.toFixed(2)} t CO₂ used` : "Speed-adjusted consumption"}
+                  icon={BarChart3}
+                />
+                <Stat
+                  label="Whale assessment"
+                  value={whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"}
+                  unit={whaleAssessed(route, inputs) ? "/100" : ""}
+                  sub={route && journey
+                    ? `${journey.activeSegment?.zone || "Open-water leg"} · ${journey.activeSpeed.toFixed(1)} kn${whaleAssessed(route, inputs) ? ` · route score ${Math.round(route.protection)}/100` : ""}`
+                    : whaleAssessed(route, inputs) ? "California scenario estimate" : "Habitat coverage incomplete"}
+                  dark
+                  icon={ShieldCheck}
+                />
+              </section>
               {route?.cargo_results && <section className="panel cargo-arrival">
                 <div className="panel-heading"><div><h2>Cargo on arrival</h2><p>Item-level estimates for the selected passage. The headline freshness is weighted by cargo mass.</p></div></div>
                 {route.score_breakdown && <div className="route-priorities">
@@ -993,6 +1018,8 @@ export default function App() {
                   </div>
                 </section>
               )}
+                </div>
+              </details>
             </>
           ) : view === "profile" ? (
             user ? (
