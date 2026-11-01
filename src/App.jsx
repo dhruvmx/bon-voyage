@@ -195,14 +195,15 @@ export default function App() {
     [progress, setProgress] = useState(0),
     [playing, setPlaying] = useState(false),
     [query, setQuery] = useState("");
-  const modalVersion = useRef(0), pendingRemovals = useRef(new Set());
+  const modalVersion = useRef(0), pendingRemovals = useRef(new Set()), editingRecord = useRef(null);
+  editingRecord.current = editingId;
   const [removingIds, setRemovingIds] = useState([]);
   const setModal = useCallback((next) => {
     ++modalVersion.current;
     setModalState(next);
   }, []);
   const [introState, setIntroState] = useState(() => shouldShowIntro() ? "playing" : "done");
-  const closeModal = useCallback(() => setModal(null), []),
+  const closeModal = useCallback(() => setModal(null), [setModal]),
     requestNo = useRef(0),
     desiredRoute = useRef(null),
     toastTimer = useRef(null);
@@ -512,7 +513,7 @@ export default function App() {
   async function removeRecord(type, id) {
     if (pendingRemovals.current.has(id)) return;
     const dialog = modalVersion.current, owner = account.current;
-    const session = getSessionVersion(), draft = draftVersion.current;
+    const session = getSessionVersion();
     const isOwner = () => owner === account.current && session === getSessionVersion();
     pendingRemovals.current.add(id); setRemovingIds((previous) => [...previous, id]);
     try {
@@ -520,7 +521,7 @@ export default function App() {
       if (!isOwner()) return;
       await refresh();
       if (!isOwner()) return;
-      if (type === "voyages" && editingId === id && draft === draftVersion.current) {
+      if (type === "voyages" && editingRecord.current === id) {
         invalidateDraftRequests(); setEditingId(null);
       }
       notify(type === "voyages" ? "Voyage deleted." : "Vessel removed.");

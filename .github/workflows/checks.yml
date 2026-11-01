@@ -23,7 +23,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       BON_VOYAGE_TEST_POSTGRES_URL: postgresql://postgres:test-password@localhost:5432/bon_voyage_test
-      BON_VOYAGE_DB: ${{ runner.temp }}/bon-voyage.sqlite3
+      BON_VOYAGE_DB: /tmp/bon-voyage-ci.sqlite3
     steps:
       - uses: actions/checkout@v4
         with:
