@@ -225,7 +225,7 @@ export default function App() {
       setUser(null); setVoyages([]); setVessels([]); setStats(null);
       setVesselId(""); setEditingId(null); setView("planner");
       setAuthMode("login"); setModal("auth");
-      notify("Your session expired. Log in to continue; your draft is preserved.");
+      notify("Session expired. Log in to continue. Draft kept.");
     };
     window.addEventListener("bon-voyage-session-expired", expired);
     return () => window.removeEventListener("bon-voyage-session-expired", expired);
@@ -418,7 +418,7 @@ export default function App() {
       desiredRoute.current = v.route_id; setInputs(v.inputs);
       setVesselId(v.vessel_id || ""); setEditingId(v.id);
       setVoyageName(v.name); setNotes(v.notes); setVoyageStatus(v.status);
-      setView("planner"); notify("Voyage loaded. Adjust inputs and save to update it.");
+      setView("planner"); notify("Voyage loaded.");
     } catch (e) { if (owner === account.current && draft === draftVersion.current) setDataError(e.message); }
   }
   const newVoyage = () => {
@@ -457,7 +457,7 @@ export default function App() {
       await refresh();
       if (!isCurrent()) return;
       if (dialog === modalVersion.current) setModal(null);
-      notify(editingId ? "Voyage updated." : "Voyage saved to your account.");
+      notify(editingId ? "Voyage updated." : "Voyage saved.");
     } catch (err) {
       if (isCurrent()) setDataError(err.message);
     } finally {
@@ -684,22 +684,16 @@ export default function App() {
             <div>
               <h1>
                 {view === "planner"
-                  ? "Plan your passage."
+                  ? "Route planner"
                   : view === "voyages"
-                    ? "Your voyages. Your course."
+                    ? "My voyages"
                     : view === "fleet"
-                      ? "A fleet with purpose."
+                      ? "My fleet"
                       : view === "insights"
-                        ? "Every passage adds up."
-                        : "Make yourself at home."}
+                        ? "Impact overview"
+                        : "Profile"}
               </h1>
-              <p>
-                {view === "planner"
-                  ? "Choose your ports. Find your best way across."
-                  : view === "profile"
-                    ? "Your identity, preferences, and account."
-                    : "Your maritime workspace, connected from port to port."}
-              </p>
+
             </div>
             {view === "planner" ? (
               <button
@@ -740,10 +734,10 @@ export default function App() {
               <h2>
                 {planError
                   ? "The backend is unavailable."
-                  : "Connecting to your ocean workspace…"}
+                  : "Loading…"}
               </h2>
               <p>
-                {planError || "Loading ports and cargo categories from Python."}
+                {planError || "Loading ports and cargo…"}
               </p>
               <button className="button" onClick={() => location.reload()}>
                 Reconnect
@@ -760,39 +754,40 @@ export default function App() {
                 </div>
               </section>}
               <section className="voyage-dashboard" aria-labelledby="voyage-dashboard-title">
-                <h2 id="voyage-dashboard-title">Voyage dashboard</h2>
-                <p className="dashboard-status" role="status">{calculating ? "Updating estimates… Previous results are shown until calculation finishes." : "Planning simulation · estimates follow map playback, not live vessel telemetry."}</p>
-                {journey?.arrivalFreshness != null && journey.arrivalFreshness < 70 && !calculating && <p className="warning" role="status">Cargo handling review needed: lowest modeled arrival quality is {journey.arrivalFreshness.toFixed(1)}%, below the 70% planning target. Choose a faster passage or verify product-specific transport temperature, remaining shelf life and cargo age. If these are correct, use a shorter supply chain; the model cannot preserve cargo beyond its usable life.</p>}
-                {journey?.worstFreshness !== null && journey?.worstFreshness < 70 && <p className="warning">At least one perishable item has only {journey.worstFreshness.toFixed(1)}% modeled shelf life left. Review its age, handling temperature and shelf life; this passage may not be suitable.</p>}
+                <div className="dashboard-heading">
+                  <h2 id="voyage-dashboard-title">Voyage dashboard</h2>
+                  <span className="dashboard-status" role="status">{calculating ? "Updating…" : "Simulation"}</span>
+                </div>
+                {!calculating && journey && ((journey.arrivalFreshness != null && journey.arrivalFreshness < 70) || (journey.worstFreshness != null && journey.worstFreshness < 70)) && <p className="warning" role="status">Cargo below 70%: {journey.worstFreshness.toFixed(1)}% now · {journey.arrivalFreshness.toFixed(1)}% on arrival. Check cargo settings or choose a faster route.</p>}
               <section className="stats" aria-label="Simulated voyage statistics" aria-busy={calculating}>
                 <Stat
-                  label="Perishable shelf life remaining"
+                  label="Cargo freshness"
                   value={journey?.worstFreshness != null ? journey.worstFreshness.toFixed(1) : "N/A"}
                   unit={journey?.worstFreshness != null ? "%" : ""}
-                  sub={route ? `${Number(inputs.weight).toLocaleString()} tonnes · ${manifest.length} cargo item${manifest.length === 1 ? "" : "s"} · ${journey?.perishableCount ? `${Math.min(...route.cargo_results.filter((item) => item.perishable).map((item) => item.freshness)).toFixed(1)}% lowest on arrival` : "No perishable cargo"}` : "Calculate a passage to see cargo quality"}
+                  sub={route ? `${journey?.perishableCount ? `Lowest item · ${journey.arrivalFreshness.toFixed(1)}% on arrival` : "No perishable cargo"}` : "No route calculated"}
                   icon={Leaf}
                 />
                 <Stat
-                  label="Time to destination"
+                  label="Time remaining"
                   value={journey ? journey.remainingHours.toFixed(1) : "—"}
                   unit="hrs"
-                  sub={journey ? `${journey.elapsedHours.toFixed(1)} h simulated · ETA ${date(route.eta)}` : "Calculate a passage to see ETA"}
+                  sub={journey ? `ETA ${date(route.eta)}` : "No route calculated"}
                   icon={Clock}
                 />
                 <Stat
-                  label="Simulated fuel consumed"
+                  label="Fuel used"
                   value={journey ? journey.fuelConsumed.toFixed(2) : "—"}
                   unit="t"
-                  sub={route && journey ? `${route.fuel.toFixed(1)} t planned · ${journey.co2Consumed.toFixed(2)} t CO₂ used` : "Speed-adjusted consumption"}
+                  sub={route && journey ? `${route.fuel.toFixed(1)} t total · ${journey.co2Consumed.toFixed(1)} t CO₂` : "No route calculated"}
                   icon={BarChart3}
                 />
                 <Stat
-                  label="Whole-route whale assessment"
+                  label="Whale assessment"
                   value={whaleAssessed(route, inputs) ? Math.round(route.protection) : "N/A"}
                   unit={whaleAssessed(route, inputs) ? "/100" : ""}
                   sub={route && journey
-                    ? `${whaleAssessed(route, inputs) ? "Modeled habitat exposure · higher is better; not a safety probability" : "Habitat coverage incomplete; no score available"}`
-                    : whaleAssessed(route, inputs) ? "California scenario estimate" : "Habitat coverage incomplete"}
+                    ? `${whaleAssessed(route, inputs) ? "Whole route · higher is better" : "No habitat data"}`
+                    : whaleAssessed(route, inputs) ? "California estimate" : "Habitat coverage incomplete"}
                   dark
                   icon={ShieldCheck}
                 />
@@ -992,15 +987,9 @@ export default function App() {
                     />
                     {route && !route.feasible && (
                       <div className="warning">
-                        No candidate passage can meet this deadline within the vessel limits. Earliest estimated arrival: {date(result.earliest_eta)} ({formatDuration(result.optimization.earliest_possible_hours)} after departure). Extend the deadline or review vessel limits.
+                        Deadline cannot be met. Earliest arrival: {date(result.earliest_eta)} ({formatDuration(result.optimization.earliest_possible_hours)} after departure). Extend the deadline or adjust speed limits.
                       </div>
                     )}
-                    {route &&
-                      (route.worst_cargo_freshness ?? route.freshness) < 70 && (
-                        <div className="warning">
-                          One or more cargo items have low freshness. Review the item-level results, handling values, or arrival deadline.
-                        </div>
-                      )}
                     <button
                       className="button full"
                       disabled={!ready}
@@ -1039,21 +1028,21 @@ export default function App() {
               </div>
 
               <details className="panel planner-report">
-                <summary><span><strong>Voyage details</strong><small>Cargo quality, arrival timings and speed breakdown</small></span><Plus size={16} aria-hidden="true" /></summary>
+                <summary><span><strong>Voyage details</strong><small>Cargo, timing and speed</small></span><Plus size={16} aria-hidden="true" /></summary>
                 <div className="planner-report-body">
               {route && result.deadline_at && <section className="panel deadline-summary" aria-label="Deadline and arrival estimate">
                 <div><small>Latest acceptable arrival</small><strong>{date(result.deadline_at)}</strong></div>
                 <div><small>Estimated arrival · selected passage</small><strong>{date(route.eta)}</strong></div>
                 <div><small>{route.feasible ? "Time before deadline" : "Time past deadline"}</small><strong>{formatDuration(Math.abs(route.slack_hours))}</strong></div>
-                <p role="status">{calculating ? "Updating path and speed estimates…" : result.status === "infeasible" ? "Deadline infeasible at the allowed speeds. Showing the earliest available estimate." : result.optimization?.deadline_binding ? "The deadline requires a faster cruise than the unconstrained recommendation. Earlier arrival is still allowed." : "The recommended path and speed are chosen for cargo and operating costs. No waiting is added to fill the allowance."}</p>
+                <p role="status">{calculating ? "Updating…" : result.status === "infeasible" ? "Deadline cannot be met at the allowed speeds." : result.optimization?.deadline_binding ? "Faster cruise needed to meet the deadline." : "Arrival allowance is a deadline, not a sailing duration."}</p>
               </section>}
 
               {route?.cargo_results && <section className="panel cargo-arrival">
-                <div className="panel-heading"><div><h2>Cargo on arrival</h2><p>Item-level estimates for the selected passage. The headline freshness is weighted by cargo mass.</p></div></div>
+                <div className="panel-heading"><div><h2>Cargo on arrival</h2></div></div>
                 {route.score_breakdown && <div className="route-priorities">
                   <strong>Applied route priorities</strong>
                   <span>{Math.round(route.score_breakdown.weights.freshness * 100)}% freshness · {Math.round(route.score_breakdown.weights.fuel * 100)}% fuel · {route.score_breakdown.components.habitat === null ? "Habitat unassessed" : `${Math.round(route.score_breakdown.weights.habitat * 100)}% habitat`}</span>
-                  <small>For Recommended balance, arrival feasibility, avoiding expiry and reducing the worst perishable shortfall below the 70% quality target come before these cost weights. Fastest and lowest-fuel alternatives retain their own objectives.</small>
+                  <small>Recommended balance prioritizes cargo above the 70% arrival target.</small>
                 </div>}
                 <div className="cargo-table-wrap"><table><caption className="sr-only">Cargo freshness and remaining shelf life</caption>
                   <thead><tr><th scope="col">Cargo</th><th scope="col">Weight</th><th scope="col">Freshness</th><th scope="col">Shelf life left</th></tr></thead>
@@ -1136,7 +1125,7 @@ export default function App() {
               {!voyages.length ? (
                 <Empty
                   icon={Flag}
-                  title={query ? "No matching voyages." : "Your next passage starts here."}
+                  title={query ? "No matching voyages." : "No saved voyages"}
                   text={query ? "Try another voyage or cargo name." : "Plan a voyage, select a route, and save it to your account."}
                   action="Plan a voyage"
                   onClick={newVoyage}
@@ -1227,8 +1216,8 @@ export default function App() {
               {!vessels.length ? (
                 <Empty
                   icon={Ship}
-                  title="Meet your future fleet."
-                  text="Add vessel specifications to calculate routes using their speed, fuel consumption, and cargo capacity."
+                  title="No vessels yet"
+                  text="Add a vessel to use its speed, fuel and capacity limits."
                   action="Add your first vessel"
                   onClick={() => setModal({ type: "vessel", item: null })}
                 />
@@ -1321,7 +1310,7 @@ export default function App() {
                 setVesselId(ship.id);
               }).catch((e) => { if (e.status !== 404) notify(e.message); });
             }
-            notify("Welcome aboard, " + u.name + ".");
+            notify("Logged in as " + u.name + ".");
           }}
         />
       )}
@@ -1353,7 +1342,7 @@ export default function App() {
       )}
       {modal === "save" && (
         <Modal
-          title={editingId ? "Update your passage." : route?.feasible ? "Your course is set." : "Save this late-arrival estimate."}
+          title={editingId ? "Update voyage" : route?.feasible ? "Save voyage" : "Save late-arrival estimate"}
           eyebrow="SAVE TO YOUR WORKSPACE"
           onClose={closeModal}
         >
@@ -1481,14 +1470,14 @@ function Auth({ mode, setMode, onClose, onSuccess }) {
   }
   return (
     <Modal
-      title={mode === "signup" ? "Welcome aboard." : "Good to have you back."}
-      eyebrow="YOUR OCEAN WORKSPACE"
+      title={mode === "signup" ? "Create account" : "Log in"}
+      eyebrow="BON VOYAGE"
       onClose={onClose}
     >
       <p>
         {mode === "signup"
           ? "Create an account to save your voyages and manage your fleet."
-          : "Log in to pick up where your last passage left off."}
+          : "Access your saved voyages."}
       </p>
       <div className="auth-tabs">
         <button
@@ -1573,7 +1562,7 @@ function AccountPrompt({ open }) {
     <Empty
       icon={User}
       title="A workspace of your own."
-      text="Create an account or log in to manage vessels, save voyages, and track your impact."
+      text="Log in to save voyages and manage vessels."
       action="Log in / sign up"
       onClick={open}
     />
@@ -1598,7 +1587,7 @@ function VesselForm({ item, onClose, onSave }) {
     [error, setError] = useState("");
   return (
     <Modal
-      title={item ? "Edit your vessel." : "A new addition to the fleet."}
+      title={item ? "Edit your vessel." : "Add vessel"}
       eyebrow="VESSEL SPECIFICATIONS"
       onClose={onClose}
     >
@@ -1681,7 +1670,7 @@ function Profile({ user, setUser, notify, onLogout }) {
       </section>
       <section className="panel profile-edit">
         <h2>Your profile</h2>
-        <p>Make this workspace yours.</p>
+        <p>Profile details</p>
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -1833,10 +1822,10 @@ function Insights({ voyages, stats, onPlan }) {
           icon={Leaf}
         />
         <Stat
-          label="Whole-route whale assessment"
+          label="Whale assessment"
           value={protection === null ? "N/A" : Math.round(protection)}
           unit={protection === null ? "" : "/100"}
-          sub={`${stats?.assessed ?? assessed.length} of ${stats?.total ?? voyages.length} voyages have California scenario estimates`}
+          sub={`${stats?.assessed ?? assessed.length} of ${stats?.total ?? voyages.length} voyages have California estimates`}
           dark
           icon={ShieldCheck}
         />

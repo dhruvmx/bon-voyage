@@ -99,7 +99,7 @@ const nextFrame = (page) => page.evaluate(() => new Promise((r) => requestAnimat
     await page.context().clearCookies();
     await page.getByRole('button', { name: 'My voyages', exact: true }).click();
     await page.getByRole('button', { name: 'Refresh voyages', exact: true }).click();
-    await page.getByRole('heading', { name: 'Good to have you back.', exact: true }).waitFor();
+    await page.getByRole('heading', { name: 'Log in', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
     console.log('PASS: current-session expiry still prompts login.');
 

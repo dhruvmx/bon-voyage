@@ -46,7 +46,7 @@ export default memo(function Appearance() {
         role="dialog" aria-labelledby="appearance-title"
         onToggle={(event) => setOpen(event.newState === "open")}>
         <div className="appearance-heading">
-          <div><h2 id="appearance-title">Appearance</h2><p>A workspace that feels like you.</p></div>
+          <div><h2 id="appearance-title">Appearance</h2></div>
           <button className="icon-button" aria-label="Close appearance" onClick={() => panel.current.hidePopover()}><X size={17} /></button>
         </div>
         <fieldset className="theme-options">
