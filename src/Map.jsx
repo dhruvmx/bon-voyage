@@ -449,6 +449,7 @@ export default function VoyageMap({
           className="small-button"
           onClick={() => setShowLayers(!showLayers)}
           aria-expanded={showLayers}
+          aria-label="Map layers"
         >
           <Layers size={14} /> Map layers
         </button>
@@ -536,11 +537,11 @@ export default function VoyageMap({
           Map attribution ↗
         </a>
       </div>
-      {coverage?.whale && <div className="coverage-note" role="status">
-        <strong>{coverage.whale.score_available ? "California scenario coverage" : "Whale habitat coverage incomplete"}</strong>
+      {coverage?.whale && <details className="coverage-note">
+        <summary><strong>{coverage.whale.score_available ? "California scenario coverage" : "Whale habitat coverage incomplete"}</strong><span>Data details</span></summary>
         <p>{coverage.whale.summary} {coverage.whale.note}</p>
         <a href={coverage.whale.global_reference} target="_blank" rel="noreferrer">About worldwide habitat coverage ↗</a>
-      </div>}
+      </details>}
       <div className="playback">
         <button
           className="play-button"

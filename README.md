@@ -14,7 +14,7 @@ Requires Python 3.10+ and Node.js 20.19+ or 22.12+.
 python run.py
 ```
 
-On Windows, double-click `Start-Bon-Voyage.cmd` if Python Launcher is installed. The launcher creates an isolated environment, installs dependencies, builds React, and starts Python. Open **http://localhost:8000**. Stop with Ctrl+C.
+On Windows, double-click `Start-Bon-Voyage.cmd` if Python Launcher is installed. The launcher creates an isolated environment, installs dependencies, builds React, and starts Python. It resynchronizes changed dependency manifests and rebuilds after nested source or asset edits; `PORT` also updates the printed URL. Open **http://localhost:8000**. Stop with Ctrl+C.
 
 ## Manual setup
 
@@ -35,7 +35,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 1. Explore the dashboard as a guest. Switch cargo categories, ports, arrival windows, temperatures, and map layers.
 2. Click **Sign up** and create your own account. No seeded credentials are needed.
 3. Open **My fleet**, add a vessel, and enter minimum open-water speed, maximum speed, consumption at 18 knots, and cargo capacity.
-4. Return to the planner, expand **Vessel, cargo & departure details**, and assign the vessel.
+4. Return to the planner, expand **Vessel & departure**, and assign the vessel.
 5. Search the 255-product cargo catalogue or add custom cargo. Add up to 10 distinct items, then expand each item to edit its weight, age, shelf life, and temperature. Set departure time and an arrival window of up to 90 days.
 6. Set the latest acceptable arrival, then compare the recommended balance, fastest feasible arrival, and lowest fuel within the deadline. Play or scrub the voyage on the map.
 7. Save your passage with a name, notes, and operational status.
@@ -53,7 +53,7 @@ For development, keep Python running and use `npm run dev` in a second terminal.
 - Each of the 255 products has numeric perishability metadata. Individual food/flower horizons, temperature response, frozen/thawed quality caps, and remaining life drive automatic freshness/fuel/habitat priorities. Durable goods have zero modeled spoilage. Expand an item to inspect its model or override routing preference; selected-route priorities and score breakdowns explain the recommendation. See `backend/DATA.md` for equations and assumptions.
 - Arrival windows range from 1 to 2,160 hours (90 days), with a slider and precise numeric entry.
 - Protected segment speeds at or below 10 knots, vessel maximum-speed limits, arrival feasibility, temperature-dependent freshness, shelf-life decay, cubic fuel calculation, CO₂ estimates, and whale exposure scores.
-- Route comparison sits immediately beneath the map, beside the planning form on desktop. Cards show sailing time, fuel burned, lowest cargo quality, and deadline slack, with fuel differences explicitly compared to the recommendation. Selecting an option scrolls to its map and briefly emphasizes its path; reduced-motion preferences receive static emphasis.
+- The planner opens with a compact selected-passage summary, map and port inputs. Cargo editing, arrival allowance, route comparison and the detailed voyage report expand on demand; no planning features are removed. The selected passage and its metrics are centered in equal columns on laptops, with the passage name above three metrics on phones. Mobile controls use larger touch targets and compact navigation labels. Signed-out visitors are displayed as John Doe (guest); signed-in profiles use their own account name. On mobile, the setup form appears before the map. Route comparison sits in an expandable section immediately beneath the map, beside the planning form on desktop. Cards show sailing time, fuel burned, lowest cargo quality, and deadline slack, with fuel differences explicitly compared to the recommendation. Selecting an option scrolls to its map and briefly emphasizes its path; reduced-motion preferences receive static emphasis.
 - Interactive Leaflet map with bundled Natural Earth coastline data, habitat overlays, protected speed segments, alternatives, tooltips, zoom, recentering, and time-based ship animation.
 - JSON export, editable profiles, fleet management, voyage statuses, search, empty states, loading states, validation, and API error handling.
 - Responsive layout with mobile navigation.
@@ -74,15 +74,17 @@ Tests cover authentication, password changes, duplicate accounts, password hashi
 
 Additional checks cover international and Pacific dateline passages, readable missing-dependency/no-route errors, 90-day arrival windows, catalogue size and uniqueness, manifest limits and custom cargo, item-level freshness, canonical product identity, combined-weight capacity checks, and manifest persistence.
 
-Browser regressions cover delayed saves, renewed sessions, genuine expiry, and playback endpoints. Install Chromium once with `npx playwright install chromium`, then start an isolated local server in one terminal:
+Browser regressions cover delayed saves, renewed sessions, genuine expiry, and playback endpoints. `npm run test:planner` also checks the compact homepage and access to cargo/custom cargo, deadlines, vessel settings, comparison, live metrics, export, map coverage, and mobile layouts. Install Chromium once with `npx playwright install chromium`, then start an isolated local server in one terminal:
 
 ```sh
 BON_VOYAGE_DB=/tmp/bon-voyage-browser.sqlite3 python -m uvicorn backend.main:app --port 8001
 ```
 
-Run `npm run test:browser` in a second terminal. These checks create unique test accounts and voyages in that test database. `BON_VOYAGE_TEST_URL` overrides the local URL; `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing Chromium executable.
+Run `npm run test:browser` in a second terminal. `npm run test:dialogs` checks delayed vessel saves/deletions, edit-target preservation, duplicate-delete prevention, and recovery from malformed responses. These checks create unique test accounts and voyages in that test database. `BON_VOYAGE_TEST_URL` overrides the local URL; `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing Chromium executable.
 
 API numeric minimums are 0.001 hours for shelf life, 0.001 tonnes for cargo weight, and 0.001 tonnes/day for consumption. Smaller values return validation errors before calculations.
+
+GitHub Actions runs the backend tests, frontend tests, production build, and browser suites on pull requests and pushes to `main`. A disposable PostgreSQL service exercises the real storage adapter, JSON summary/search queries, impact totals, snapshots, and account isolation. Locally, set `BON_VOYAGE_TEST_POSTGRES_URL` to a test PostgreSQL database to enable that integration test; it creates and removes only a uniquely named test schema. Without the variable, that test is skipped and the SQLite suite still runs.
 
 ## API
 
@@ -105,6 +107,8 @@ Interactive API documentation: http://localhost:8000/docs
 Responses include per-route `cargo_results`, `worst_cargo_freshness`, `whale_assessed`, and top-level coverage metadata. International `protection` values are null. The optimizer searches every candidate path at 0.01-knot open-water speed intervals within vessel limits. Protected transit speed is also optimized from 5 knots to the applicable cap (at most 10 knots), at 0.1-knot resolution. The arrival window is a maximum, with no waiting added. Results expose ETA, deadline slack, search metadata, and explicit infeasibility when even the fastest candidate is late. Identical path/speed options are labeled; `distinct_paths` reports the actual geometric count. A missing routing dependency returns a readable 503; an unavailable passage returns 422.
 
 List endpoints return `{ items, total, limit, offset, has_more }`, with 20 items by default (maximum 100). Both accept `limit`, `offset` and `q`; voyage search covers the voyage name and cargo manifest. Voyage list items contain small card summaries, without coordinates, segments or full manifests. Fetch `GET /api/voyages/{id}` to edit or export the complete saved snapshot; `GET /api/vessels/{id}` resolves off-page vessel assignments. Fleet and voyage screens load additional pages on demand, while `/api/voyages/stats` supplies totals across the whole account. Session expiry prompts login, preserves the current draft, and restores its record/vessel association when the same account signs back in.
+
+Read requests and stateless route calculations time out after 30 seconds and support cancellation. Invalid successful response bodies produce a recoverable error. Writes are never automatically retried. Display names are trimmed before their length is validated; password whitespace is preserved.
 
 Departure timestamps require a timezone and a UTC year between 1900 and 2100; unsupported dates return validation errors. California habitat scoring uses absolute modeled exposure with a fixed reference, so open-water detours cannot dilute an unchanged habitat passage. See `backend/DATA.md` for the normalization.
 
@@ -138,3 +142,9 @@ Production storage adapter: backend/database.py. Neon uses psycopg with pooled c
 
 
 
+
+## Workspace search
+
+Use the header search button or Ctrl/Cmd+K to find features, every supported port, and all cargo products. Suggestions update as you type; use the arrow keys and Enter, or select a result directly. Port suggestions explicitly set departure or destination; cargo suggestions add products without duplicates and respect the 10-item limit. Feature results open the appropriate controls, including appearance, route comparison, exports, and custom cargo. Escape closes search.
+
+Signed-in users can also search all their saved voyages and vessels. Server-side search is debounced and cancellable, with more-results controls for paginated matches. Selecting a voyage loads its complete saved data; selecting a vessel assigns its current specifications. Account changes and expired sessions dismiss search and clear its private results. Run `npm run test:search` against the isolated browser test server for live suggestions, keyboard actions, pagination, stale responses, and 320–1440px layouts.
