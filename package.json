@@ -10,7 +10,8 @@
     "start": "python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000",
     "test": "python -m unittest discover -s backend -p test_*.py",
     "test:frontend": "node --test src/*.test.js",
-    "test:browser": "node tests/browser-races.cjs"
+    "test:browser": "node tests/browser-races.cjs",
+    "test:intro": "node tests/browser-intro.cjs"
   },
   "dependencies": {
     "react": "^19.2.0",

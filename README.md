@@ -115,7 +115,7 @@ Departure timestamps require a timezone and a UTC year between 1900 and 2100; un
 `BON_VOYAGE_DB` overrides the local database path (`TIDEWAY_DB` remains supported for existing local installs). `PORT` overrides the launcher port. Set `COOKIE_SECURE=true` when serving behind HTTPS. The Python server serves the built Vite frontend from the same origin. On Vercel, connect the Neon integration: DATABASE_URL selects PostgreSQL automatically. Deployment refuses ephemeral SQLite storage. The earlier hosted static Site remains separate from this local full-stack version.
 
 
-Every page load and refresh opens with the Moses parting the sea animation for demos. The Skip button opens the workspace immediately. Reduced-motion preferences skip the opening.
+Every page load and refresh opens with the Moses parting the sea animation for demos. The Skip button opens the workspace immediately. Reduced-motion preferences skip the opening. The scene uses vector artwork and coordinated staff/water motion, with no generated scene images. Escape also skips the sequence; enabling reduced motion during playback exits immediately. Run `npm run test:intro` against the isolated browser test server to check timing, replay, mobile layouts, and interaction restoration.
 
 ## Styling
 
