@@ -1057,7 +1057,7 @@ export default function App() {
                   <div className="speed-segments">
                     <div><strong>{route.protected_distance > 0 ? `${route.protected_speed.toFixed(2)} kn` : "N/A"}</strong><small>Modeled slow zones only</small></div>
                     <div><strong>{route.speed.toFixed(2)} kn</strong><small>Open-water speed</small></div>
-                    <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Earliest quality horizon on arrival"}</small></div>
+                    <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Shortest shelf life left on arrival"}</small></div>
                   </div>
                 </section>
               )}
@@ -1319,27 +1319,18 @@ export default function App() {
       )}
       {modal === "help" && (
         <Modal
-          title="Three priorities. One passage."
-          eyebrow="THE BON VOYAGE APPROACH"
+          title="How to plan a voyage"
+          eyebrow="HELP"
           onClose={closeModal}
         >
-          <p>
-            Choose ports and cargo, then adjust arrival time, temperature, and
-            vessel specifications. The arrival deadline is a maximum allowance. The planner searches candidate sea paths and operating speeds, then compares a recommended balance, the fastest feasible arrival, and the lowest fuel within the deadline.
-          </p>
+          <p>Choose ports, add cargo, then set your vessel and arrival deadline.</p>
           <div className="info-box">
-            <h3>What changes the route?</h3>
-            <p>
-              Each item has a perishability model, weight, and handling values. The planner considers the most time-sensitive item as well as fuel use. Modeled California slow zones stay at or below 10 knots; worldwide habitat coverage is incomplete.
-            </p>
+            <h3>Compare routes</h3>
+            <p>Choose recommended balance, fastest arrival or lowest fuel. The deadline is the maximum sailing time.</p>
           </div>
-          <p>
-            The map uses geographic coordinates and bundled Natural Earth coastlines. Habitat
-            zones and vessel conditions are configurable planning scenarios.
-            Sign up to save voyages and add your fleet.
-          </p>
+          <p>Cargo age and temperature affect freshness. Whale scores cover the California scenario only; they are not live detections.</p>
           <button className="button full" onClick={closeModal}>
-            Chart your course <ArrowUpRight size={16} />
+            Close <ArrowUpRight size={16} />
           </button>
         </Modal>
       )}
@@ -1553,8 +1544,7 @@ function Auth({ mode, setMode, onClose, onSuccess }) {
           <ArrowUpRight size={17} />
         </button>
         <p className="fine-print">
-          Your voyages are private to your account. Passwords are hashed on the
-          Python server.
+          Voyages are private to your account.
         </p>
       </form>
     </Modal>
@@ -1564,7 +1554,7 @@ function AccountPrompt({ open }) {
   return (
     <Empty
       icon={User}
-      title="A workspace of your own."
+      title="Log in to continue"
       text="Log in to save voyages and manage vessels."
       action="Log in / sign up"
       onClick={open}
@@ -1590,7 +1580,7 @@ function VesselForm({ item, onClose, onSave }) {
     [error, setError] = useState("");
   return (
     <Modal
-      title={item ? "Edit your vessel." : "Add vessel"}
+      title={item ? "Edit vessel" : "Add vessel"}
       eyebrow="VESSEL SPECIFICATIONS"
       onClose={onClose}
     >
@@ -1666,7 +1656,7 @@ function Profile({ user, setUser, notify, onLogout }) {
         <h2>{user.name}</h2>
         <p>{user.email}</p>
         <div className="stamp">{user.role}</div>
-        <p>{user.company || "Independent maritime operator"}</p>
+        <p>{user.company || "No company set"}</p>
         <button className="button secondary full" onClick={onLogout}>
           <LogOut size={15} /> Log out
         </button>
@@ -1807,7 +1797,7 @@ function Insights({ voyages, stats, onPlan }) {
         <Stat
           label="Saved voyages"
           value={stats?.total ?? voyages.length}
-          sub="Passages in your workspace"
+          sub="Saved voyages in your account"
           icon={Flag}
         />
         <Stat
@@ -1836,14 +1826,14 @@ function Insights({ voyages, stats, onPlan }) {
       {!voyages.length ? (
         <Empty
           icon={BarChart3}
-          title="Good decisions leave a wake."
-          text="Save a voyage to start tracking your cargo and ocean impact."
-          action="Plan your first voyage"
+          title="No saved voyages"
+          text="Save a voyage to see fuel, cargo and habitat estimates."
+          action="Plan a voyage"
           onClick={onPlan}
         />
       ) : (
         <section className="panel insights-panel">
-          <h2>Freshness across your passages</h2>
+          <h2>Arrival freshness</h2>
           <p>Arrival freshness for {voyages.length} loaded voyages of {stats?.total ?? voyages.length} saved shipments.</p>
           <div className="freshness-chart">
             {voyages.map((v) => (
@@ -1864,15 +1854,10 @@ function Insights({ voyages, stats, onPlan }) {
           </div>
         </section>
       )}
-      <div className="info-box">
-        <h3>How this impact is measured</h3>
-        <p>
-          Fuel is calculated segment by segment from your vessel’s consumption
-          at 18 knots, using a cubic speed model. Freshness responds to elapsed
-          time, cargo age, temperature, and the shelf-life window. Whale
-          assessment reflects only the bundled California scenario zones. Unassessed international voyages are excluded from the average; missing habitat data does not mean a passage is safe. Mixed cargo freshness is weighted by mass; recommendations also consider the most time-sensitive item.
-        </p>
-      </div>
+      <details className="info-box">
+        <summary>How estimates are calculated</summary>
+        <p>Fuel uses vessel consumption at 18 knots and segment speeds. Freshness uses cargo age, temperature and sailing time. Whale scores cover the California scenario; unassessed voyages are excluded from the average.</p>
+      </details>
     </>
   );
 }
