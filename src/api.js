@@ -1,3 +1,5 @@
+import { saveVoyagePdf } from './voyagePdf.js';
+
 // Version requests by authentication lifecycle, including renewal for the same user.
 let sessionVersion = 0;
 export const getSessionVersion = () => sessionVersion;
@@ -59,6 +61,5 @@ export async function api(path, options = {}) {
   }
 }
 export async function download(data) {
-  const { saveVoyagePdf } = await import('./voyagePdf');
   saveVoyagePdf(data);
 }

@@ -62,6 +62,8 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     const slider = page.getByRole('slider', { name: 'Voyage progress', exact: true });
     await slider.focus(); await slider.press('End');
     await page.getByText('Arrived at destination', { exact: true }).waitFor();
+    // Export must work even when deployment changes make lazy JS chunks unavailable.
+    await page.route('**/assets/*.js', (route) => route.abort());
     const downloading = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export voyage', exact: true }).click();
     const download = await downloading;
@@ -73,6 +75,7 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     assert(report.includes('Fastest feasible arrival'));
     assert(report.includes('Demo crates'));
     assert(report.includes('VOYAGE BRIEF'));
+    await page.unroute('**/assets/*.js');
     await page.locator('.planner-report > summary').click();
     await page.locator('.compare-disclosure > summary').click();
 
