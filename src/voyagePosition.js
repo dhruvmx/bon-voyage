@@ -40,8 +40,3 @@ export function continuousHeading(previous, heading) {
   return previous + ((heading - previous + 180) % 360 + 360) % 360 - 180;
 }
 
-export function continuousHeading(previous, current) {
-  if (!Number.isFinite(previous)) return current;
-  const delta = ((((current - previous) % 360) + 540) % 360) - 180;
-  return previous + delta;
-}
