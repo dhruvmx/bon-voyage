@@ -96,3 +96,18 @@ class ReviewGapTests(unittest.TestCase):
         self.assertEqual(self.client.get('/api/voyages/stats').json()['total'],0)
         self.assertEqual(self.client.get('/api/voyages/'+summary['id']).status_code,404)
         self.assertEqual(self.client.get('/api/vessels/vessel00').status_code,404)
+
+    def test_tiny_numeric_values_fail_validation_instead_of_crashing(self):
+        for fields in [
+            {'shelf_life':5e-324,'temperature':40}, {'weight':5e-324},
+            {'fuel_per_day':5e-324},
+            {'cargo_items':[{'product_id':'apples','shelf_life':5e-324,'temperature':40}]},
+        ]:
+            response=self.client.post('/api/plan',json={'departure':'2026-11-01T00:00:00Z',**fields})
+            self.assertEqual(response.status_code,422,response.text)
+        self.signup()
+        response=self.client.post('/api/vessels',json={'name':'Tiny consumption','fuel_per_day':5e-324})
+        self.assertEqual(response.status_code,422)
+        response=self.client.post('/api/plan',json={'departure':'2026-11-01T00:00:00Z',
+            'weight':.001,'fuel_per_day':.001,'shelf_life':.001,'temperature':40})
+        self.assertEqual(response.status_code,200,response.text)

@@ -66,12 +66,23 @@ The map, sea-lane network, and coastline data are bundled and work offline after
 
 ```sh
 python -m unittest discover -s backend -p "test_*.py" -v
+npm run test:frontend
 npm run build
 ```
 
 Tests cover authentication, password changes, duplicate accounts, password hashing, profile updates, account isolation, CRUD, vessel constraints, persistent records, route geometry, speed limits, temperature response, arrival feasibility, invalid inputs, and cross-origin protection. They use temporary isolated databases.
 
 Additional checks cover international and Pacific dateline passages, readable missing-dependency/no-route errors, 90-day arrival windows, catalogue size and uniqueness, manifest limits and custom cargo, item-level freshness, canonical product identity, combined-weight capacity checks, and manifest persistence.
+
+Browser regressions cover delayed saves, renewed sessions, genuine expiry, and playback endpoints. Install Chromium once with `npx playwright install chromium`, then start an isolated local server in one terminal:
+
+```sh
+BON_VOYAGE_DB=/tmp/bon-voyage-browser.sqlite3 python -m uvicorn backend.main:app --port 8001
+```
+
+Run `npm run test:browser` in a second terminal. These checks create unique test accounts and voyages in that test database. `BON_VOYAGE_TEST_URL` overrides the local URL; `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` can select an existing Chromium executable.
+
+API numeric minimums are 0.001 hours for shelf life, 0.001 tonnes for cargo weight, and 0.001 tonnes/day for consumption. Smaller values return validation errors before calculations.
 
 ## API
 
