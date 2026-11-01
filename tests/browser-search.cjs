@@ -40,7 +40,12 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     await page.getByRole('button', { name: 'Clear search', exact: true }).click();
     await search.press('ArrowDown'); assert(await search.getAttribute('aria-activedescendant'));
     await search.press('Escape');
-    await page.keyboard.press('Control+k'); await search.waitFor({ state: 'visible' }); await search.press('Escape');
+    await search.waitFor({ state: 'hidden' });
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press('Control+k'); await search.waitFor({ state: 'visible' });
+      await search.fill('compare');
+      await search.press('Escape'); await search.waitFor({ state: 'hidden' });
+    }
     console.log('PASS: live suggestions set ports, add cargo without duplicates, open controls, change themes and support keyboard navigation.');
 
     const signup = await page.request.post(root + '/api/auth/signup', { data: { name: 'Search Operator', email: `search-${Date.now()}@example.com`, password: 'search-test-password' } });

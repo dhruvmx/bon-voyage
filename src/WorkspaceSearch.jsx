@@ -69,7 +69,7 @@ export default function WorkspaceSearch({ catalog, user, blocked, onAction }) {
     <button className="workspace-search-trigger" aria-label="Search workspace" disabled={blocked} onClick={() => { setQuery(''); setActive(0); setOpen(true); }}>
       <Search size={17} aria-hidden="true" /><span>Search anything…</span><kbd>⌘ / Ctrl K</kbd>
     </button>
-    <dialog ref={dialog} className="workspace-search" aria-label="Search workspace" onCancel={(event) => { event.preventDefault(); setOpen(false); }} onClose={() => setOpen(false)} onClick={(event) => { if (event.target === dialog.current) { const rect = dialog.current.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpen(false); } }}>
+    <dialog ref={dialog} className="workspace-search" aria-label="Search workspace" onCancel={(event) => { event.preventDefault(); setOpen(false); }} onClose={(event) => { if (!event.currentTarget.open) setOpen(false); }} onClick={(event) => { if (event.target === dialog.current) { const rect = dialog.current.getBoundingClientRect(); if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpen(false); } }}>
       <div className="workspace-search-input">
         <Search size={20} aria-hidden="true" />
         <input ref={input} role="combobox" aria-label="Search features, ports, cargo and saved records" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={matches[current] ? `${id}-${current}` : undefined} autoComplete="off" maxLength={100}
