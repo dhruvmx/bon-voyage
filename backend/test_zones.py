@@ -176,6 +176,10 @@ class RoutingTests(unittest.TestCase):
             self.assertTrue(route['whale_assessed'])
             self.assertIsNotNone(route['protection']); self.assertLess(route['protection'], 100)
             self.assertGreater(route['protected_distance'], 0)
+            exposure=route['calculation']['habitat_exposure']
+            reference=route['calculation']['habitat_reference_nm']
+            self.assertGreater(exposure,0)
+            self.assertAlmostEqual(route['protection'],100*reference/(reference+exposure),places=1)
             self.assertIn('Strait of Gibraltar whale area (approx.)', {s['zone'] for s in route['segments']})
         self.assertIn('es-strait-of-gibraltar', result['active_zone_ids'])
 

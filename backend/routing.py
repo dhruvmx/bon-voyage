@@ -249,7 +249,7 @@ def materialize_route(candidate,mode,p,assessed,reference_fuel):
         'cargo_model_version':MODEL_VERSION,'optimizer_version':OPTIMIZER_VERSION,
         'coordinates':path['coordinates'],'segments':segments,
         'calculation':{'fuel_tonnes_per_day_at_18_knots':p.fuel_per_day,'fuel_reference_speed_knots':18,'co2_per_tonne_fuel':3.114,
-                       'habitat_reference_nm':HABITAT_REFERENCE_NM,'habitat_exposure':path['whale_distance']*(candidate['zone_speed']/10)**2*p.whale_activity if california else None},
+                       'habitat_reference_nm':HABITAT_REFERENCE_NM,'habitat_exposure':path['whale_distance']*(candidate['zone_speed']/10)**2*p.whale_activity if assessed else None},
     }
 
 
