@@ -807,15 +807,6 @@ export default function App() {
                   <span><small>Arrival</small><strong>{date(route.eta)}</strong></span>
                 </div>
               </section>}
-              <details className="panel planner-report">
-                <summary><span><strong>Voyage details</strong><small>Playback metrics, cargo quality and timings</small></span><Plus size={16} aria-hidden="true" /></summary>
-                <div className="planner-report-body">
-              {route && result.deadline_at && <section className="panel deadline-summary" aria-label="Deadline and arrival estimate">
-                <div><small>Latest acceptable arrival</small><strong>{date(result.deadline_at)}</strong></div>
-                <div><small>Estimated arrival · selected passage</small><strong>{date(route.eta)}</strong></div>
-                <div><small>{route.feasible ? "Time before deadline" : "Time past deadline"}</small><strong>{formatDuration(Math.abs(route.slack_hours))}</strong></div>
-                <p role="status">{calculating ? "Updating path and speed estimates…" : result.status === "infeasible" ? "Deadline infeasible at the allowed speeds. Showing the earliest available estimate." : result.optimization?.deadline_binding ? "The deadline requires a faster cruise than the unconstrained recommendation. Earlier arrival is still allowed." : "The recommended path and speed are chosen for cargo and operating costs. No waiting is added to fill the allowance."}</p>
-              </section>}
               <section className="stats">
                 <Stat
                   label={manifest.length > 1 ? "Cargo freshness now (avg.)" : "Cargo freshness now"}
@@ -849,29 +840,6 @@ export default function App() {
                   icon={ShieldCheck}
                 />
               </section>
-              {route?.cargo_results && <section className="panel cargo-arrival">
-                <div className="panel-heading"><div><h2>Cargo on arrival</h2><p>Item-level estimates for the selected passage. The headline freshness is weighted by cargo mass.</p></div></div>
-                {route.score_breakdown && <div className="route-priorities">
-                  <strong>Applied route priorities</strong>
-                  <span>{Math.round(route.score_breakdown.weights.freshness * 100)}% freshness · {Math.round(route.score_breakdown.weights.fuel * 100)}% fuel · {route.score_breakdown.components.habitat === null ? "Habitat unassessed" : `${Math.round(route.score_breakdown.weights.habitat * 100)}% habitat`}</span>
-                  <small>Arrival feasibility and avoiding newly exhausted cargo budgets come first. Then these weights rank quality loss, fuel use, and available habitat data.</small>
-                </div>}
-                <div className="cargo-table-wrap"><table><caption className="sr-only">Cargo freshness and remaining shelf life</caption>
-                  <thead><tr><th scope="col">Cargo</th><th scope="col">Weight</th><th scope="col">Freshness</th><th scope="col">Shelf life left</th></tr></thead>
-                  <tbody>{route.cargo_results.map((item, index) => <tr key={index}><th scope="row">{item.name}</th><td>{item.weight.toLocaleString()} t</td><td className={item.freshness < 70 ? "cargo-at-risk" : ""}>{item.freshness.toFixed(1)}%</td><td>{item.perishable === false || item.profile === "electronics" ? "Non-perishable" : formatHours(Math.floor(item.shelf_remaining))}</td></tr>)}</tbody>
-                </table></div>
-              </section>}
-              {route && (
-                <section className="panel speed-panel">
-                  <div className="speed-segments">
-                    <div><strong>{route.protected_distance > 0 ? `${route.protected_speed.toFixed(2)} kn` : "N/A"}</strong><small>Modeled slow zones only</small></div>
-                    <div><strong>{route.speed.toFixed(2)} kn</strong><small>Open-water speed</small></div>
-                    <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Earliest quality horizon on arrival"}</small></div>
-                  </div>
-                </section>
-              )}
-                </div>
-              </details>
               <div className="planner-grid">
                 <section className="panel config">
                   <div className="panel-heading">
@@ -1109,6 +1077,39 @@ export default function App() {
                 </div>
               </div>
 
+              <details className="panel planner-report">
+                <summary><span><strong>Voyage details</strong><small>Cargo quality, arrival timings and speed breakdown</small></span><Plus size={16} aria-hidden="true" /></summary>
+                <div className="planner-report-body">
+              {route && result.deadline_at && <section className="panel deadline-summary" aria-label="Deadline and arrival estimate">
+                <div><small>Latest acceptable arrival</small><strong>{date(result.deadline_at)}</strong></div>
+                <div><small>Estimated arrival · selected passage</small><strong>{date(route.eta)}</strong></div>
+                <div><small>{route.feasible ? "Time before deadline" : "Time past deadline"}</small><strong>{formatDuration(Math.abs(route.slack_hours))}</strong></div>
+                <p role="status">{calculating ? "Updating path and speed estimates…" : result.status === "infeasible" ? "Deadline infeasible at the allowed speeds. Showing the earliest available estimate." : result.optimization?.deadline_binding ? "The deadline requires a faster cruise than the unconstrained recommendation. Earlier arrival is still allowed." : "The recommended path and speed are chosen for cargo and operating costs. No waiting is added to fill the allowance."}</p>
+              </section>}
+
+              {route?.cargo_results && <section className="panel cargo-arrival">
+                <div className="panel-heading"><div><h2>Cargo on arrival</h2><p>Item-level estimates for the selected passage. The headline freshness is weighted by cargo mass.</p></div></div>
+                {route.score_breakdown && <div className="route-priorities">
+                  <strong>Applied route priorities</strong>
+                  <span>{Math.round(route.score_breakdown.weights.freshness * 100)}% freshness · {Math.round(route.score_breakdown.weights.fuel * 100)}% fuel · {route.score_breakdown.components.habitat === null ? "Habitat unassessed" : `${Math.round(route.score_breakdown.weights.habitat * 100)}% habitat`}</span>
+                  <small>Arrival feasibility and avoiding newly exhausted cargo budgets come first. Then these weights rank quality loss, fuel use, and available habitat data.</small>
+                </div>}
+                <div className="cargo-table-wrap"><table><caption className="sr-only">Cargo freshness and remaining shelf life</caption>
+                  <thead><tr><th scope="col">Cargo</th><th scope="col">Weight</th><th scope="col">Freshness</th><th scope="col">Shelf life left</th></tr></thead>
+                  <tbody>{route.cargo_results.map((item, index) => <tr key={index}><th scope="row">{item.name}</th><td>{item.weight.toLocaleString()} t</td><td className={item.freshness < 70 ? "cargo-at-risk" : ""}>{item.freshness.toFixed(1)}%</td><td>{item.perishable === false || item.profile === "electronics" ? "Non-perishable" : formatHours(Math.floor(item.shelf_remaining))}</td></tr>)}</tbody>
+                </table></div>
+              </section>}
+              {route && (
+                <section className="panel speed-panel">
+                  <div className="speed-segments">
+                    <div><strong>{route.protected_distance > 0 ? `${route.protected_speed.toFixed(2)} kn` : "N/A"}</strong><small>Modeled slow zones only</small></div>
+                    <div><strong>{route.speed.toFixed(2)} kn</strong><small>Open-water speed</small></div>
+                    <div><strong>{route.shelf_remaining === null ? "No modeled expiry" : `${route.shelf_remaining.toFixed(0)} h`}</strong><small>{route.shelf_remaining === null ? "Non-perishable cargo" : "Earliest quality horizon on arrival"}</small></div>
+                  </div>
+                </section>
+              )}
+                </div>
+              </details>
             </>
           ) : view === "profile" ? (
             user ? (
