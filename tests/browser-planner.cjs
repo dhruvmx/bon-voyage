@@ -92,7 +92,7 @@ const root = process.env.BON_VOYAGE_TEST_URL || 'http://127.0.0.1:8001';
     await page.locator('.cargo-editor > summary').click();
     await page.getByRole('spinbutton', { name: 'Apples shelf life (days)', exact: true }).fill('0.01');
     await page.locator('.cargo-editor > summary').click();
-    await page.getByText(/One or more cargo items have low freshness/).waitFor();
+    await page.getByText(/Cargo below 70%/).waitFor();
     await page.getByRole('button', { name: 'Appearance', exact: true }).click();
     await page.getByLabel('Dark', { exact: true }).check();
     await page.getByRole('button', { name: 'Close appearance' }).click();
