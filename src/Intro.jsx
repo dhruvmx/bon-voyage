@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 
-// A rear-view silhouette keeps the figure quiet and avoids an articulated face.
+// Vector figure used by the opening animation.
 function Moses() {
   return <svg viewBox="0 0 320 560" className="intro-moses-art" aria-hidden="true">
     <defs>

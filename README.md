@@ -45,6 +45,7 @@ npm run build
 
 ## Reference
 
+- [Repo guide](STRUCTURE.md) — folders, key files and request flow.
 - [API routes](backend/main.py) — local docs: `http://localhost:8000/docs`.
 - [Calculations & data coverage](backend/DATA.md) — model assumptions and California habitat coverage.
 - [Data licences](public/DATA-LICENSE.md)
