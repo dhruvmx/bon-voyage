@@ -36,6 +36,20 @@ test('incorrect passwords do not expire the session or renew its version', async
   assert.equal(events,0); assert.equal(getSessionVersion(),before);
 });
 
+test('Google exchange renews sessions while invalid Google credentials do not expire them', async () => {
+  globalThis.window = new EventTarget();
+  let events = 0; window.addEventListener('bon-voyage-session-expired', () => events++);
+  const before = getSessionVersion();
+  globalThis.fetch = async () => response(401);
+  await assert.rejects(api('/auth/google', {method:'POST'}), error => error.status === 401);
+  assert.equal(events, 0); assert.equal(getSessionVersion(), before);
+  globalThis.fetch = async () => ({ok:false,status:409,json:async()=>({detail:{code:'account_link_required',message:'Connect your existing account'}})});
+  await assert.rejects(api('/auth/google', {method:'POST'}), error => error.code === 'account_link_required' && error.message === 'Connect your existing account');
+  globalThis.fetch = async () => response(200);
+  await api('/auth/google', {method:'POST'});
+  assert.equal(getSessionVersion(), before + 1);
+});
+
 test('HTML and empty successful responses report an error instead of entering app state', async () => {
   for (const json of [async()=>{throw new SyntaxError('HTML');},async()=>null,async()=>'unexpected text']) {
     globalThis.fetch=async()=>({ok:true,status:200,json});

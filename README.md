@@ -45,6 +45,8 @@ npm run build
 
 ## Reference
 
+- [Google sign-in setup](FIREBASE.md) — Firebase configuration and account linking.
+
 - [Repo guide](STRUCTURE.md) — folders, key files and request flow.
 - [API routes](backend/main.py) — local docs: `http://localhost:8000/docs`.
 - [Calculations & data coverage](backend/DATA.md) — model assumptions and California habitat coverage.

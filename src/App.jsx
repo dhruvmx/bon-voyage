@@ -26,11 +26,12 @@ import {
 import { api, download, getSessionVersion } from "./api";
 import RouteMapSkeleton from "./MapSkeleton";
 const VoyageMap = lazy(() => import("./Map"));
+const GoogleSignIn = lazy(() => import("./GoogleSignIn"));
 import { journeyAtProgress } from "./journey";
 import RouteComparison from "./RouteComparison";
-import Appearance from "./Appearance";
+import Appearance from "./Appearance.jsx";
 import WorkspaceSearch from "./WorkspaceSearch";
-import Intro from "./Intro";
+import Intro from "./Intro.jsx";
 import { shouldShowIntro } from "./intro";
 import SidebarControls from "./SidebarControls";
 import CargoPicker from "./CargoPicker";
@@ -1451,6 +1452,7 @@ function Auth({ mode, setMode, onClose, onSuccess }) {
     [busy, setBusy] = useState(false);
   async function submit(e) {
     e.preventDefault();
+    if (busy) return;
     setError("");
     setBusy(true);
     const p = Object.fromEntries(new FormData(e.currentTarget));
@@ -1473,8 +1475,12 @@ function Auth({ mode, setMode, onClose, onSuccess }) {
           ? "Create an account to save your voyages and manage your fleet."
           : "Access your saved voyages."}
       </p>
+      <Suspense fallback={<p className="fine-print">Loading Google sign-in…</p>}>
+        <GoogleSignIn busy={busy} setBusy={setBusy} onSuccess={onSuccess} />
+      </Suspense>
       <div className="auth-tabs">
         <button
+          disabled={busy}
           className={mode === "signup" ? "active" : ""}
           onClick={() => {
             setMode("signup");
@@ -1485,6 +1491,7 @@ function Auth({ mode, setMode, onClose, onSuccess }) {
         </button>
         <button
           className={mode === "login" ? "active" : ""}
+          disabled={busy}
           onClick={() => {
             setMode("login");
             setError("");
@@ -1714,6 +1721,7 @@ function Profile({ user, setUser, notify, onLogout }) {
         </form>
         <hr />
         <h2>Account security</h2>
+        {user.has_password === false ? <p>You sign in with Google. Manage your password in your Google Account.</p> : <>
         <p>Update your password. Other sessions will be signed out.</p>
         <button
           className="button secondary"
@@ -1780,6 +1788,7 @@ function Profile({ user, setUser, notify, onLogout }) {
             </button>
           </form>
         )}
+        </>}
       </section>
     </div>
   );

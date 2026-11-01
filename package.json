@@ -19,6 +19,7 @@
     "test:cargo": "node tests/browser-cargo.cjs"
   },
   "dependencies": {
+    "firebase": "^13.1.0",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",

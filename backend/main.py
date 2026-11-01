@@ -2,6 +2,7 @@ import math, hashlib, hmac, json, os, re, secrets, sqlite3, time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,8 +11,10 @@ from typing import Literal
 from .routing import PORTS, CARGOS, ZONES, plan, RoutePlanningError, DATA_COVERAGE
 from .cargo_catalog import PRODUCTS, PRODUCT_BY_ID
 from .database import connect, database_url, INTEGRITY_ERRORS
+from .firebase_auth import public_config, verify_google_token
 
 ROOT=Path(__file__).resolve().parents[1]
+load_dotenv(ROOT/'.env')
 DB=Path(os.environ.get('BON_VOYAGE_DB',os.environ.get('TIDEWAY_DB',str(ROOT/'data'/'tideway.sqlite3'))))
 if not database_url() and not os.environ.get('VERCEL'):
     DB.parent.mkdir(parents=True,exist_ok=True)
@@ -40,6 +43,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS vessels(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS voyages(id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),data TEXT NOT NULL,created_at REAL NOT NULL,updated_at REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS login_attempts(key TEXT NOT NULL,at REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS auth_identities(provider TEXT NOT NULL,subject TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,PRIMARY KEY(provider,subject));
         CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires);
         CREATE INDEX IF NOT EXISTS attempts_key_idx ON login_attempts(key,at);
         CREATE INDEX IF NOT EXISTS vessels_user_idx ON vessels(user_id);
@@ -64,7 +68,7 @@ async def security(request,call_next):
 
 def hash_password(password,salt):
     return hashlib.pbkdf2_hmac('sha256',password.encode(),bytes.fromhex(salt),310000).hex()
-def public_user(row): return {k:row[k] for k in ('id','email','name','company','role')}
+def public_user(row): return {**{k:row[k] for k in ('id','email','name','company','role')},'has_password':bool(row['password_hash'])}
 def current_user(request:Request):
     token=request.cookies.get('tideway_session',''); digest=hashlib.sha256(token.encode()).hexdigest()
     with db() as c: row=c.execute('SELECT u.* FROM users u JOIN sessions s ON u.id=s.user_id WHERE s.token_hash=? AND s.expires>?',(digest,time.time())).fetchone()
@@ -102,6 +106,49 @@ class PasswordChange(BaseModel):
     current_password:str=Field(min_length=1,max_length=128)
     new_password:str=Field(min_length=8,max_length=128)
 
+class GoogleCredentials(BaseModel):
+    id_token:str=Field(min_length=20,max_length=20000)
+    password:str|None=Field(default=None,min_length=1,max_length=128)
+
+@app.get('/api/auth/config')
+def auth_config():
+    return {'google':public_config()}
+
+@app.post('/api/auth/google')
+def google_login(p:GoogleCredentials,request:Request,response:Response):
+    # Limit exchanges before fetching public certificates, including link attempts.
+    key=hashlib.sha256(('google|'+(request.client.host if request.client else '')).encode()).hexdigest()
+    with db() as c:
+        c.execute('DELETE FROM login_attempts WHERE at<?',(time.time()-900,))
+        if c.execute('SELECT COUNT(*) AS attempts FROM login_attempts WHERE key=?',(key,)).fetchone()['attempts']>=20:
+            raise HTTPException(429,'Too many Google sign-in attempts. Try again in 15 minutes.')
+        c.execute('INSERT INTO login_attempts VALUES(?,?)',(key,time.time()))
+    claims=verify_google_token(p.id_token)
+    try:
+        with db() as c:
+            row=c.execute('SELECT u.* FROM users u JOIN auth_identities a ON u.id=a.user_id WHERE a.provider=? AND a.subject=?',('firebase_google',claims['identity'])).fetchone()
+            if not row:
+                row=c.execute('SELECT * FROM users WHERE email=?',(claims['email'],)).fetchone()
+                if row:
+                    # An email match alone cannot link an unverified password account.
+                    if not p.password:
+                        raise HTTPException(409,{'code':'account_link_required','message':'An account already uses this email. Enter its existing password once to connect Google and keep your saved voyages.'})
+                    if not row['password_hash'] or not hmac.compare_digest(hash_password(p.password,row['salt']),row['password_hash']):
+                        raise HTTPException(401,'The existing account password is incorrect.')
+                else:
+                    uid=secrets.token_hex(12)
+                    name=str(claims.get('name') or claims['email'].split('@')[0]).strip()[:80]
+                    if len(name)<2: name='Google user'
+                    c.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?,?)',(uid,claims['email'],name,'','Fleet operator',secrets.token_hex(16),'',time.time()))
+                    row=c.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+                c.execute('INSERT INTO auth_identities VALUES(?,?,?)',('firebase_google',claims['identity'],row['id']))
+            user=public_user(row)
+            c.execute('DELETE FROM login_attempts WHERE key=?',(key,))
+    except INTEGRITY_ERRORS as error:
+        raise HTTPException(409,'Another sign-in completed at the same time. Please try Google sign-in again.') from error
+    session(response,user['id'])
+    return user
+
 @app.get('/api/health')
 def health():
     with db() as c: c.execute('SELECT 1')
@@ -115,7 +162,7 @@ def signup(p:Signup,response:Response):
         with db() as c: c.execute('INSERT INTO users VALUES(?,?,?,?,?,?,?,?)',(uid,p.email,p.name.strip(),p.company.strip(),'Fleet operator',salt,hash_password(p.password,salt),time.time()))
     except INTEGRITY_ERRORS: raise HTTPException(409,'An account with this email already exists. Log in instead.')
     session(response,uid)
-    return {'id':uid,'email':p.email,'name':p.name.strip(),'company':p.company.strip(),'role':'Fleet operator'}
+    return {'id':uid,'email':p.email,'name':p.name.strip(),'company':p.company.strip(),'role':'Fleet operator','has_password':True}
 @app.post('/api/auth/login')
 def login(p:Credentials,request:Request,response:Response):
     key=hashlib.sha256((p.email+'|'+(request.client.host if request.client else '')).encode()).hexdigest()
@@ -144,6 +191,7 @@ def profile(p:Profile,user=Depends(current_user)):
 def password(p:PasswordChange,response:Response,user=Depends(current_user)):
     with db() as c:
         row=c.execute('SELECT * FROM users WHERE id=?',(user['id'],)).fetchone()
+        if not row['password_hash']: raise HTTPException(400,'This account uses Google sign-in. Manage your password in your Google Account.')
         if not hmac.compare_digest(hash_password(p.current_password,row['salt']),row['password_hash']): raise HTTPException(400,'Current password is incorrect.')
         salt=secrets.token_hex(16)
         c.execute('UPDATE users SET salt=?,password_hash=? WHERE id=?',(salt,hash_password(p.new_password,salt),user['id']))

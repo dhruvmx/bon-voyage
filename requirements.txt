@@ -3,4 +3,6 @@ uvicorn>=0.34,<1
 httpx>=0.28,<1
 psycopg[binary]>=3.2,<4
 searoute==1.6.0
+google-auth[requests]>=2.38,<3
+python-dotenv>=1,<2
 

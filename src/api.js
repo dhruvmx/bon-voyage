@@ -3,7 +3,7 @@ import { saveVoyagePdf } from './voyagePdf.js';
 // Version requests by authentication lifecycle, including renewal for the same user.
 let sessionVersion = 0;
 export const getSessionVersion = () => sessionVersion;
-const sessionActions = new Set(["/auth/login", "/auth/signup", "/auth/logout", "/auth/password"]);
+const sessionActions = new Set(["/auth/login", "/auth/signup", "/auth/google", "/auth/logout", "/auth/password"]);
 
 export async function api(path, options = {}) {
   const requestSession = sessionVersion;
@@ -38,15 +38,16 @@ export async function api(path, options = {}) {
     }
     if (!response.ok) {
       const staleSession = requestSession !== sessionVersion;
-      if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/me"].includes(path)) {
+      if (response.status === 401 && !staleSession && !["/auth/login", "/auth/signup", "/auth/google", "/auth/me"].includes(path)) {
         ++sessionVersion;
         window.dispatchEvent(new Event("bon-voyage-session-expired"));
       }
       const detail = data?.detail;
       const error = new Error(Array.isArray(detail)
         ? detail.map((x) => `${x.loc.at(-1)}: ${x.msg}`).join(" · ")
-        : detail || `Request failed (${response.status}).`);
+        : (typeof detail === "object" ? detail?.message : detail) || `Request failed (${response.status}).`);
       error.status = response.status;
+      error.code = typeof detail === "object" && !Array.isArray(detail) ? detail?.code : undefined;
       error.staleSession = staleSession;
       throw error;
     }
